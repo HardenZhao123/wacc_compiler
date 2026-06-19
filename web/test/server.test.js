@@ -92,6 +92,11 @@ console.log("compiled " + path.basename(sourcePath));
   assert.ok(readiness.statusCode === 200 || readiness.statusCode === 503);
   assert.equal(typeof JSON.parse(readiness.body).ready, "boolean");
 
+  const headReadiness = await request(address.port, "HEAD", "/api/ready");
+  assert.equal(headReadiness.statusCode, readiness.statusCode);
+  assert.equal(headReadiness.body, "");
+  assert.match(headReadiness.headers["content-type"], /application\/json/);
+
   const wrongContentType = await request(address.port, "POST", "/api/compile");
   assert.equal(wrongContentType.statusCode, 415);
 

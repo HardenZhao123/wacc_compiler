@@ -40,14 +40,14 @@ const MIME_TYPES = {
   ".webmanifest": "application/manifest+json; charset=utf-8",
 };
 
-function json(res, statusCode, value) {
+function json(res, statusCode, value, omitBody = false) {
   const body = JSON.stringify(value);
   res.writeHead(statusCode, {
     "Content-Type": "application/json; charset=utf-8",
     "Content-Length": Buffer.byteLength(body),
     "Cache-Control": "no-store",
   });
-  res.end(body);
+  res.end(omitBody ? undefined : body);
 }
 
 function positiveInteger(value, fallback) {
@@ -513,7 +513,7 @@ async function serveStatic(req, res, pathname) {
       "Cache-Control": "no-cache",
       "X-Content-Type-Options": "nosniff",
     });
-    res.end(contents);
+    res.end(req.method === "HEAD" ? undefined : contents);
   } catch (error) {
     if (error.code === "ENOENT") json(res, 404, { error: "Not found" });
     else throw error;
@@ -535,7 +535,7 @@ function createServer(options = {}) {
     const url = new URL(req.url, "http://localhost");
     setSecurityHeaders(res);
     try {
-      if (req.method === "GET" && url.pathname === "/api/ready") {
+      if ((req.method === "GET" || req.method === "HEAD") && url.pathname === "/api/ready") {
         const status = serviceStatus(options);
         json(res, status.ready ? 200 : 503, {
           ready: status.ready,
@@ -545,18 +545,18 @@ function createServer(options = {}) {
             arm32: status.architectures.arm32.available,
           },
           queue: compileQueue.status,
-        });
+        }, req.method === "HEAD");
         return;
       }
 
-      if (req.method === "GET" && url.pathname === "/api/health") {
+      if ((req.method === "GET" || req.method === "HEAD") && url.pathname === "/api/health") {
         const status = serviceStatus(options);
         json(res, 200, {
           ready: status.ready,
           compiler: status.compiler,
           architectures: status.architectures,
           queue: compileQueue.status,
-        });
+        }, req.method === "HEAD");
         return;
       }
 
@@ -597,7 +597,7 @@ function createServer(options = {}) {
         return;
       }
 
-      if (req.method === "GET") {
+      if (req.method === "GET" || req.method === "HEAD") {
         await serveStatic(req, res, url.pathname);
         return;
       }
