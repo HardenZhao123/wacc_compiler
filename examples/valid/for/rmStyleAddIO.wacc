@@ -1,0 +1,34 @@
+# register machine style addition
+
+# Input: 2 40
+
+# Output:
+# Enter the first number: Enter the second number: Initial value of x: 2
+# (+)(+)(+)(+)(+)(+)(+)(+)(+)(+)(+)(+)(+)(+)(+)(+)(+)(+)(+)(+)(+)(+)(+)(+)(+)(+)(+)(+)(+)(+)(+)(+)(+)(+)(+)(+)(+)(+)(+)(+)
+# final value of x: 42
+#
+
+# Program:
+
+begin
+  int x = 0 ;
+  int y = 0 ;
+  int i = 0 ;
+
+  print "Enter the first number: " ;
+  read x ;
+  print "Enter the second number: " ;
+  read y ;
+
+  print "Initial value of x: " ;
+  println x ;
+
+  for (i = 0, i < y, i = i + 1)
+    print "(+)" ;
+    x = x + 1
+  done ;
+
+  println "" ;
+  print "final value of x: " ;
+  println x
+end

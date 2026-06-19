@@ -1,0 +1,11 @@
+# simple while loop
+
+# Output:
+
+# Program:
+
+begin
+  do
+    skip
+  while false
+end

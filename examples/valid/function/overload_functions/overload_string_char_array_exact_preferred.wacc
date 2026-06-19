@@ -1,0 +1,24 @@
+# function overloading with string and char[]
+
+# Output:
+# 2
+# 1
+#
+
+# Program:
+
+begin
+  int kind(string s) is
+    return 1
+  end
+
+  int kind(char[] s) is
+    return 2
+  end
+
+  char[] a = ['h', 'i'];
+  int x = call kind(a);
+  println x;
+  int y = call kind("ok");
+  println y
+end

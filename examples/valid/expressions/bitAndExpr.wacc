@@ -1,0 +1,14 @@
+# evaluating bitwise and
+
+# Output:
+# 20
+#
+
+# Program:
+
+begin
+  int a = 27 ;
+  int b = 14 ;
+  int c = (a & b) * 2 ;
+  println c
+end

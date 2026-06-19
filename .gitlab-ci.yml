@@ -1,0 +1,86 @@
+stages:
+  - compile
+  - unit-test
+  - integration-test-frontend
+  - integration-test-backend
+
+variables:
+  RUN_FRONTEND_INTEGRATION_TESTS: "true"
+  RUN_BACKEND_INTEGRATION_TESTS: "true"
+  COURSIER_CACHE: ".cache/coursier"
+
+cache:
+  paths:
+    - .scala-build/
+    - .bsp/
+    - .cache/coursier/
+
+compile:
+  stage: compile
+  script:
+    - set -euo pipefail
+    - scala-cli compile . --server=false --jvm system
+
+unit-test:
+  stage: unit-test
+  needs: ["compile"]
+  script:
+    - set -euo pipefail
+    - scala-cli test . --test-only 'wacc.unit_test*' --server=false --jvm system | tee wacc-unit-test.log
+  artifacts:
+    paths:
+      - wacc-unit-test.log
+    expire_in: 1 day
+
+integration-test-frontend:
+  stage: integration-test-frontend
+  needs: ["unit-test"]
+  script:
+    - set -euo pipefail
+    - |
+      if [ "$RUN_FRONTEND_INTEGRATION_TESTS" = "true" ]; then
+        test -d examples || { echo "missing ./examples in repo" | tee -a integration_backend.log; exit 1; }
+      
+        timeout -k 10s 15m scala-cli test . --test-only 'wacc.integration_test.frontend.*' --server=false --jvm system | tee integration_frontend.log
+      else
+        echo "Frontend integration tests disabled" | tee integration_frontend.log
+      fi
+  artifacts:
+    when: always
+    paths:
+      - integration_frontend.log
+    expire_in: 1 week
+
+integration-test-backend:
+  stage: integration-test-backend
+  needs: ["integration-test-frontend"]
+  timeout: 35m
+  script:
+    - set -euo pipefail
+    - |
+      if [ "$RUN_BACKEND_INTEGRATION_TESTS" = "true" ]; then
+        echo "Running backend integration tests" | tee -a integration_backend.log
+      else
+        echo "Backend tests disabled (RUN_BACKEND_INTEGRATION_TESTS != true)" | tee -a integration_backend.log
+        exit 0
+      fi
+
+      command -v arm-linux-gnueabi-gcc >/dev/null 2>&1 || { echo "missing arm32-linux-gnu-gcc" | tee -a integration_backend.log; exit 1; }
+      command -v qemu-arm >/dev/null 2>&1 || { echo "missing qemu-arm32" | tee -a integration_backend.log; exit 1; }
+      command -v timeout >/dev/null 2>&1 || { echo "missing timeout (coreutils)" | tee -a integration_backend.log; exit 1; }
+      
+      command -v aarch64-linux-gnu-gcc >/dev/null 2>&1 || { echo "missing aarch64-linux-gnu-gcc" | tee -a integration_backend.log; exit 1; }
+      command -v qemu-aarch64 >/dev/null 2>&1 || { echo "missing qemu-aarch64" | tee -a integration_backend.log; exit 1; }
+      command -v timeout >/dev/null 2>&1 || { echo "missing timeout (coreutils)" | tee -a integration_backend.log; exit 1; }
+      
+      test -d examples || { echo "missing ./examples in repo" | tee -a integration_backend.log; exit 1; }
+
+      scala-cli --power package . -o wacc-compiler --server=false --jvm system --force | tee -a integration_backend.log
+      chmod +x ./compile ./wacc-compiler
+
+      timeout -k 2m 33m scala-cli test . --test-only 'wacc.integration_test.backend.*' --server=false --jvm system | tee -a integration_backend.log
+  artifacts:
+    when: always
+    paths:
+      - integration_backend.log
+    expire_in: 1 week

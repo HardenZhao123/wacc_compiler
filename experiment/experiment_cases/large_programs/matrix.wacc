@@ -1,0 +1,141 @@
+begin
+
+  # Function to print a matrix
+  int print_matrix(int[][] mat, int rows, int cols) is
+    int i = 0;
+    while i < rows do
+      int j = 0;
+      while j < cols do
+        int[] row = mat[i];
+        int elem = row[j];
+        print elem;
+        print " ";
+        j = j + 1
+      done;
+      println "";
+      i = i + 1
+    done;
+    return 0
+  end
+
+  # Function to add two matrices
+  int add_matrices(int[][] A, int[][] B, int[][] result, int rows, int cols) is
+    int i = 0;
+    while i < rows do
+      int j = 0;
+      while j < cols do
+        int[] rowA = A[i];
+        int elemA = rowA[j];
+        int[] rowB = B[i];
+        int elemB = rowB[j];
+        result[i][j] = elemA + elemB;
+        j = j + 1
+      done;
+      i = i + 1
+    done;
+    return 0
+  end
+
+  # Function to multiply two matrices
+  int multiply_matrices(int[][] A, int[][] B, int[][] result, int rowsA, int colsA, int colsB) is
+    int i = 0;
+    while i < rowsA do
+      int j = 0;
+      while j < colsB do
+        int k = 0;
+        result[i][j] = 0;
+        while k < colsA do
+          int[] rowA = A[i];
+          int elemA = rowA[k];
+          int[] rowB = B[k];
+          int elemB = rowB[j];
+          int[] result_tmp_arr = result[i];
+          int result_tmp = result_tmp_arr[j];
+          result[i][j] = result_tmp + elemA * elemB;
+          k = k + 1
+        done;
+        j = j + 1
+      done;
+      i = i + 1
+    done;
+    return 0
+  end
+
+  # Function to transpose a matrix
+  int transpose_matrix(int[][] A, int[][] result, int rows, int cols) is
+    int i = 0;
+    while i < rows do
+      int j = 0;
+      while j < cols do
+        int[] rowA = A[i];
+        int elemA = rowA[j];
+        result[j][i] = elemA;
+        j = j + 1
+      done;
+      i = i + 1
+    done;
+    return 0
+  end
+
+  # --- Main Program ---
+  print "General matrix operations in WACC\n";
+
+  # Define matrix sizes
+  int rowsA = 3;
+  int colsA = 3;
+  int rowsB = 3;
+  int colsB = 3;
+
+  # Allocate matrices
+  int[] rowA1 = [0, 0, 0];
+  int[] rowA2 = [0, 0, 0];
+  int[] rowA3 = [0, 0, 0];
+  int[] rowB1 = [0, 0, 0];
+  int[] rowB2 = [0, 0, 0];
+  int[] rowB3 = [0, 0, 0];
+  int[] rowSum1 = [0, 0, 0];
+  int[] rowSum2 = [0, 0, 0];
+  int[] rowSum3 = [0, 0, 0];
+  int[] rowProduct1 = [0, 0, 0];
+  int[] rowProduct2 = [0, 0, 0];
+  int[] rowProduct3 = [0, 0, 0];
+  int[] rowTranspose1 = [0, 0, 0];
+  int[] rowTranspose2 = [0, 0, 0];
+  int[] rowTranspose3 = [0, 0, 0];
+
+  int[][] A = [rowA1, rowA2, rowA3];
+  int[][] B = [rowB1, rowB2, rowB3];
+  int[][] sum = [rowSum1, rowSum2, rowSum3];
+  int[][] product = [rowProduct1, rowProduct2, rowProduct3];
+  int[][] transpose = [rowTranspose1, rowTranspose2, rowTranspose3];
+
+  # Initialize matrices
+  int i = 0;
+  while i < rowsA do
+    int j = 0;
+    while j < colsA do
+      A[i][j] = i + j + 1;
+      B[i][j] = (i + 1) * (j + 1);
+      j = j + 1
+    done;
+    i = i + 1
+  done;
+
+  # Perform operations
+  int x = call add_matrices(A, B, sum, rowsA, colsA);
+  x = call multiply_matrices(A, B, product, rowsA, colsA, colsB);
+  x = call transpose_matrix(A, transpose, rowsA, colsA);
+
+  # Print results
+  print "Matrix A:\n";
+  x = call print_matrix(A, rowsA, colsA);
+  print "Matrix B:\n";
+  x = call print_matrix(B, rowsB, colsB);
+  print "Sum Matrix:\n";
+  x = call print_matrix(sum, rowsA, colsA);
+  print "Product Matrix:\n";
+  x = call print_matrix(product, rowsA, colsB);
+  print "Transpose of Matrix A:\n";
+  x = call print_matrix(transpose, colsA, rowsA)
+
+end

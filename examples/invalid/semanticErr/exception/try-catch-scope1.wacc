@@ -1,0 +1,21 @@
+# the x of println x is out of scope
+
+# Output:
+# #semantic_error#
+
+# Exit:
+# 200
+
+# Program:
+
+begin
+    try
+        int e = 1;
+        int x = 1;
+        throw ArithmeticException("exception")
+    catch ArithmeticException e do
+        println e;
+        x = x + 2
+   done;
+   println x
+end

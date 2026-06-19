@@ -1,0 +1,15 @@
+# simple unentered while loop
+
+# Output:
+# end of loop
+#
+
+# Program:
+
+begin
+  for (skip, false, skip)
+    println "looping..."
+  done ;
+
+  println "end of loop"
+end

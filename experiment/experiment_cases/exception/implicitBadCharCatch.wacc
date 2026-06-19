@@ -1,0 +1,19 @@
+# implicit bad-char conversion inside try should be catchable
+
+# Output:
+# caught bad char exception
+# int is not ascii character 0-127
+# survived
+
+# Program:
+
+begin
+  try
+    char c = chr 200
+  catch BadCharException err do
+    println "caught bad char exception";
+    println err
+  done;
+
+  println "survived"
+end

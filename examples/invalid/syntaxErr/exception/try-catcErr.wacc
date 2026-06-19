@@ -1,0 +1,14 @@
+# catch typo
+
+# Output:
+# #syntax_error#
+
+# Program:
+
+begin
+    try
+        int x = 1
+    catc ArithmeticException e do
+        println e
+   done
+end

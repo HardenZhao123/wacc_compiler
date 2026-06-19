@@ -1,0 +1,46 @@
+# a three-level exception thrown inside functions and it should be caught in main
+
+# Output:
+# Entering level 1
+# Entering level 2
+# Entering level 3
+# Caught in main: Depth error from level 3
+# Execution continued in main.
+
+# Program:
+
+begin
+  # Level 3: The Source
+  int level3() is
+    println "Entering level 3";
+    throw ArithmeticException("Depth error from level 3");
+    println "This should never print (L3)";
+    return 3
+  end
+
+  # Level 2: The Bridge
+  int level2() is
+    println "Entering level 2";
+    int x = call level3();
+    println "This should never print (L2)";
+    return 2
+  end
+
+  # Level 1: The Bridge
+  int level1() is
+    println "Entering level 1";
+    int x = call level2();
+    println "This should never print (L1)";
+    return 1
+  end
+
+  # Main: The Handler
+  try
+    int x = call level1()
+  catch ArithmeticException e do
+    print "Caught in main: ";
+    println e
+  done;
+
+  println "Execution continued in main."
+end

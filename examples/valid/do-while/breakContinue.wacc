@@ -1,0 +1,23 @@
+# do-while loop using continue and break
+
+# Output:
+# 1
+# 3
+# 4
+# finished
+#
+
+# Program:
+
+begin
+  int i = 0 ;
+
+  do
+    i = i + 1 ;
+    if i == 2 then Continue else skip fi;
+    if i == 5 then Break else skip fi;
+    println i
+  while i < 10 ;
+
+  println "finished"
+end

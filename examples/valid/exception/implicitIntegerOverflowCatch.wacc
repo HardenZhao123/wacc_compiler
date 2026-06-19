@@ -1,0 +1,19 @@
+# implicit integer overflow inside try should be catchable
+
+# Output:
+# caught integer overflow
+# integer overflow or underflow occurred
+# survived
+
+# Program:
+
+begin
+  try
+    int x = 2147483647 + 1
+  catch IntegerOverflowException err do
+    println "caught integer overflow";
+    println err
+  done;
+
+  println "survived"
+end

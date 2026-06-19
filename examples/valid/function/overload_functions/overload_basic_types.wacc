@@ -1,0 +1,36 @@
+# function overloading with basic types
+
+# Output:
+# 123
+# 1
+# 65
+#
+
+# Program:
+
+begin
+  int tag(int x) is
+    return 100 + x
+  end
+
+  int tag(bool x) is
+    if x then
+      return 1
+    else
+      return 0
+    fi
+  end
+
+  int tag(char x) is
+    return ord x
+  end
+
+  int x = call tag(23);
+  println x;
+
+  int y = call tag(true);
+  println y;
+
+  int z = call tag('A');
+  println z
+end

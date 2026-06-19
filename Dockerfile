@@ -1,0 +1,37 @@
+FROM virtuslab/scala-cli:latest AS compiler-build
+
+WORKDIR /source
+COPY project.scala ./
+COPY src/main ./src/main
+RUN scala-cli --power package . --assembly --server=false --force \
+    --main-class wacc.Main -o /wacc-compiler.jar
+
+FROM node:22-bookworm-slim
+
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends \
+      gcc-aarch64-linux-gnu \
+      gcc-arm-linux-gnueabi \
+      openjdk-17-jre-headless \
+      qemu-user \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app
+COPY --from=compiler-build /wacc-compiler.jar ./wacc-compiler.jar
+COPY package.json ./
+COPY web ./web
+COPY examples ./examples
+COPY docker/wacc-compiler ./docker/wacc-compiler
+
+ENV HOST=0.0.0.0
+ENV PORT=3000
+ENV WACC_COMPILER=/app/docker/wacc-compiler
+ENV MAX_CONCURRENT_JOBS=2
+ENV MAX_QUEUED_JOBS=20
+ENV RATE_LIMIT_REQUESTS=30
+
+EXPOSE 3000
+USER node
+HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 \
+  CMD node -e "fetch('http://127.0.0.1:'+(process.env.PORT||3000)+'/api/ready').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
+CMD ["npm", "start"]

@@ -1,0 +1,16 @@
+# a basic try-catch of a general exception should catch the exception and continue run after try-catch
+
+# Output:
+# caught
+# survived
+
+# Program:
+
+begin
+  try
+    throw Exception("exception here")
+  catch Exception e do
+    println "caught"
+  done;
+  println "survived"
+end

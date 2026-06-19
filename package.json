@@ -1,0 +1,13 @@
+{
+  "name": "wacc-compiler-web",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Deployable web interface for the WACC compiler",
+  "scripts": {
+    "start": "node web/server.js",
+    "test:web": "node --test web/test/*.test.js"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}

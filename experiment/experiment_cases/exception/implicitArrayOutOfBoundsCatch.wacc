@@ -1,0 +1,21 @@
+# implicit array-out-of-bounds inside try should be catchable
+
+# Output:
+# caught array bounds exception
+# array index out of bounds
+# survived
+
+# Program:
+
+begin
+  int[] xs = [10, 20, 30];
+
+  try
+    int x = xs[5]
+  catch ArrayOutOfBoundsException err do
+    println "caught array bounds exception";
+    println err
+  done;
+
+  println "survived"
+end

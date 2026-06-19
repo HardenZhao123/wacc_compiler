@@ -1,0 +1,10 @@
+.git
+.idea
+.metals
+.scala-build
+.vscode
+*.out
+*.s
+wacc-compiler
+WACC_Report.pdf
+WACC_Error_Report.pdf

@@ -1,0 +1,13 @@
+# evaluating bitwise not
+
+# Output:
+# -6
+#
+
+# Program:
+
+begin
+  int x = 5 ;
+  int y = ~x ;
+  println y
+end

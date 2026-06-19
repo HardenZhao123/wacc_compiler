@@ -1,0 +1,15 @@
+.metals/
+.bsp/
+.scala-build/
+.cache/
+.idea/
+.vscode/
+node_modules/
+.DS_Store
+example.wacc
+*.s
+*.out
+*.log
+web/.DS_Store
+wacc-compiler
+wacc-compiler.jar

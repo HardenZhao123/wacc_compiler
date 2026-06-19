@@ -1,0 +1,14 @@
+# DivideByZeroException is not defined
+
+# Output:
+# #syntax_error#
+
+# Program:
+
+begin
+    try
+        int x = 1
+    catch DivideByZeroException e do
+        println e
+   done
+end

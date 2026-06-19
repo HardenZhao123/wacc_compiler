@@ -1,0 +1,25 @@
+# function overload according to pair type argument
+
+# Output:
+# 1
+# 2
+#
+
+
+# Program:
+begin
+  int tag(pair(int, int) p) is
+    return 1
+  end
+
+  int tag(pair(char, char) p) is
+    return 2
+  end
+
+  pair(int, int) a = newpair(10, 20);
+  pair(char, char) b = newpair('x', 'y');
+  int xx = call tag(a);
+  int yy = call tag(b);
+  println xx;   # 1
+  println yy    # 2
+end

@@ -1,0 +1,15 @@
+# expresission type mismatch int->string
+
+# Output:
+# #semantic_error#
+
+# Exit:
+# 200
+
+# Program:
+
+begin
+  string s1 = "a";
+  string s2 = "b";
+  int a = s1 | s2
+end

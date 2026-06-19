@@ -1,0 +1,9 @@
+begin
+  int i = 0;
+  while i < 10 do
+    i = i + 1;
+    if i == 2 then Continue else skip fi;
+    if i == 5 then Break else skip fi
+  done;
+  print i
+end

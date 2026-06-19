@@ -1,0 +1,21 @@
+services:
+  - type: web
+    name: wacc-compiler-studio
+    runtime: docker
+    plan: free
+    region: frankfurt
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
+    healthCheckPath: /api/ready
+    autoDeployTrigger: commit
+    envVars:
+      - key: HOST
+        value: 0.0.0.0
+      - key: MAX_CONCURRENT_JOBS
+        value: 1
+      - key: MAX_QUEUED_JOBS
+        value: 10
+      - key: RATE_LIMIT_REQUESTS
+        value: 20
+      - key: TRUST_PROXY
+        value: 1

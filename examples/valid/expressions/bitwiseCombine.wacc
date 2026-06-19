@@ -1,0 +1,21 @@
+# evaluating bitwise combinations
+
+# Output:
+# ~(a & b) | (a & b) = -1
+# (a & b) + (a | b) = 17
+
+# Program:
+
+begin
+  int a = 12 ;
+  int b = 5  ;
+  int c = 0 ;
+
+  c = ~(a & b) | (a & b) ;
+  print "~(a & b) | (a & b) = " ;
+  println c ;
+
+  c = (a & b) + (a | b) ;
+  print "(a & b) + (a | b) = " ;
+  println c
+end

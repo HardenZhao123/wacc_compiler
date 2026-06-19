@@ -1,0 +1,14 @@
+# try typo
+
+# Output:
+# #syntax_error#
+
+# Program:
+
+begin
+    tr
+        int x = 1
+    catch ArithmeticException e do
+        println e
+   done
+end

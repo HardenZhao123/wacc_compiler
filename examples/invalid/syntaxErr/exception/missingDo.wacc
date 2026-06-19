@@ -1,0 +1,14 @@
+# do notation is missing
+
+# Output:
+# #syntax_error#
+
+# Program:
+
+begin
+    try
+        int x = 1
+    catch ArithmeticException e
+        println e
+   done
+end

@@ -1,0 +1,20 @@
+# a nested try-catch, the innermost handler takes priority
+
+# Output:
+# caught inner
+# back in outer
+
+# Program:
+
+begin
+  try
+    try
+      throw BadCharException("char error")
+    catch BadCharException e do
+      println "caught inner"
+    done;
+    println "back in outer"
+  catch BadCharException e do
+    println "caught outer (failure)"
+  done
+end

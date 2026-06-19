@@ -1,0 +1,15 @@
+# evaluating bitwise or
+
+# Output:
+# a | b = 111
+#
+
+# Program:
+
+begin
+  int a = 99 ;
+  int b = 15 ;
+  int c = a | b ;
+  print "a | b = " ;
+  println c
+end

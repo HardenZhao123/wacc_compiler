@@ -1,0 +1,33 @@
+# function overload according to arguments arity
+
+# Output:
+# 6
+# 12
+# 6
+#
+
+# Program:
+
+begin
+  int add(int x) is
+    return x + 1
+  end
+
+  int add(int x, int y) is
+    return x + y
+  end
+
+  int add(int x, int y, int z) is
+    return x + y + z
+  end
+
+  int x = call add(5);
+  println x;
+
+  int y = call add(5, 7);
+  println y;
+
+  int z = call add(1, 2, 3);
+  println z
+
+ end

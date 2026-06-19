@@ -1,0 +1,10 @@
+# a basic throw without catch should terminate the program with runtime error
+
+# Output:
+# fatal error: int overflow
+
+# Program:
+
+begin
+  throw IntegerOverflowException("int overflow")
+end

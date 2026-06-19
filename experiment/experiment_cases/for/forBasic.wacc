@@ -1,0 +1,11 @@
+# simple for loop
+
+# Output:
+
+# Program:
+
+begin
+  for (skip, false, skip)
+    skip
+  done
+end

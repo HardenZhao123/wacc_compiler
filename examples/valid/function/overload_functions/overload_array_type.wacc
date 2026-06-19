@@ -1,0 +1,41 @@
+# function overload according to array element type
+
+# Output:
+# 11
+# 22
+# 33
+# 44
+#
+
+# Program:
+
+begin
+  int tag(int[] xs) is
+    return 11
+  end
+
+  int tag(bool[] xs) is
+    return 22
+  end
+
+  int tag(char[] xs) is
+    return 33
+  end
+
+  int tag(string s) is
+    return 44
+  end
+
+  int[] nums = [1, 2, 3];
+  bool[] flags = [true, false];
+  char[] chars = ['a', 'b'];
+  int a = call tag(nums);
+  int b = call tag(flags);
+  int c = call tag(chars);
+  int d = call tag("hi");
+
+  println a;
+  println b;
+  println c;
+  println d
+end

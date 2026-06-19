@@ -1,0 +1,24 @@
+# the exception thrown inside a function call can be caught in main
+
+# Output:
+# throwing now
+# caught deep error
+# back in main
+
+# Program:
+
+begin
+  int f() is
+    println "throwing now";
+    throw ArithmeticException("deep error");
+    return 100
+  end
+
+  try
+    int x = call f()
+  catch ArithmeticException e do
+    print "caught ";
+    println e
+  done;
+  println "back in main"
+end

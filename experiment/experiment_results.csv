@@ -1,0 +1,25 @@
+Config,Folder,AvgExecutionTime (ms),Runs (test case),AvgBinarySize (Byte)
+ARM32 No Peephole,pairs,12.370,19,1873
+ARM32 No Peephole,nested_functions,12.811,6,1873
+ARM32 No Peephole,large_programs,14.176,6,1873
+ARM32 No Peephole,exception,12.754,10,1873
+ARM32 No Peephole,array,12.442,21,1873
+ARM32 No Peephole,for,12.763,10,1873
+ARM32 Peephole,pairs,12.354,19,1868
+ARM32 Peephole,nested_functions,12.677,6,1868
+ARM32 Peephole,large_programs,14.090,6,1868
+ARM32 Peephole,exception,12.893,10,1868
+ARM32 Peephole,array,12.389,21,1868
+ARM32 Peephole,for,12.563,10,1868
+AArch64 No Peephole,pairs,12.574,19,2750
+AArch64 No Peephole,nested_functions,12.867,6,2750
+AArch64 No Peephole,large_programs,14.370,6,2750
+AArch64 No Peephole,exception,12.951,10,2750
+AArch64 No Peephole,array,12.691,21,2750
+AArch64 No Peephole,for,12.927,10,2750
+AArch64 Peephole,pairs,12.654,19,2736
+AArch64 Peephole,nested_functions,12.795,6,2736
+AArch64 Peephole,large_programs,14.219,6,2736
+AArch64 Peephole,exception,13.018,10,2736
+AArch64 Peephole,array,12.588,21,2736
+AArch64 Peephole,for,12.831,10,2736

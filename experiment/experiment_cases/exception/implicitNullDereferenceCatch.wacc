@@ -1,0 +1,21 @@
+# implicit null-dereference inside try should be catchable
+
+# Output:
+# caught null dereference exception
+# null dereference or freed pair
+# survived
+
+# Program:
+
+begin
+  pair(int, int) p = null;
+
+  try
+    int x = fst p
+  catch NullDereferenceException err do
+    println "caught null dereference exception";
+    println err
+  done;
+
+  println "survived"
+end

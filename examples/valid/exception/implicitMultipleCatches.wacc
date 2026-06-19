@@ -1,0 +1,27 @@
+# multiple catches should dispatch to the matching implicit exception
+
+# Output:
+# caught arithmetic exception
+# divide or modulo by zero
+# survived
+
+# Program:
+
+begin
+  int n = 0;
+
+  try
+    int x = 10 / n
+  catch NullDereferenceException err do
+    println "caught null dereference exception";
+    println err
+  catch ArithmeticException err do
+    println "caught arithmetic exception";
+    println err
+  catch IntegerOverflowException err do
+    println "caught integer overflow exception";
+    println err
+  done;
+
+  println "survived"
+end

@@ -1,0 +1,20 @@
+# the general exception thrown inside a function call can be caught in main
+
+# Output:
+# fatal error: x cannot be 10
+
+# Program:
+
+begin
+  int f(int x) is
+    if x == 10 then
+        throw Exception("x cannot be 10")
+    else
+        println x
+    fi;
+    return x
+  end
+
+  int x = 10;
+  int result = call f(x)
+end

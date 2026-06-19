@@ -1,0 +1,19 @@
+# we can use the same exception variable, e, in parallel catch blocks and
+# matches the target exception
+
+# Output:
+# caught second: error 2
+
+# Program:
+
+begin
+  try
+    int x = 1;
+    throw ArrayOutOfBoundsException("error 2")
+  catch ArithmeticException e do
+    println e
+  catch ArrayOutOfBoundsException e do
+    print "caught second: ";
+    println e
+  done
+end

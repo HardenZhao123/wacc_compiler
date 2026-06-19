@@ -1,0 +1,17 @@
+{
+  "name": "WACC Compiler Studio",
+  "short_name": "WACC Studio",
+  "description": "Compile and run WACC programs for AArch64 and ARM32.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#09111f",
+  "theme_color": "#09111f",
+  "icons": [
+    {
+      "src": "/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

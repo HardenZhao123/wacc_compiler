@@ -1,0 +1,79 @@
+begin
+
+  # Function to print a matrix
+  int print_matrix(int[][] mat, int rows, int cols) is
+    int i = 0;
+    while i < rows do
+      int j = 0;
+      while j < cols do
+        int[] row = mat[i];
+        int elem = row[j];
+        print elem;
+        print " ";
+        j = j + 1
+      done;
+      println "";
+      i = i + 1
+    done;
+    return 0
+  end
+
+  # Function to perform Floyd-Warshall algorithm
+  int floyd_warshall(int[][] dist, int n) is
+    int k = 0;
+    while k < n do
+      int i = 0;
+      while i < n do
+        int j = 0;
+        while j < n do
+          # Skip if either path is "infinity"
+          int[] path1_row = dist[i];
+          int path1 = path1_row[k];
+          int[] path2_row = dist[k];
+          int path2 = path2_row[j];
+          if path1 != 99999 && path2 != 99999 then
+            if dist[i][j] > path1 + path2 then
+              dist[i][j] = path1 + path2
+            else skip
+            fi
+          else skip
+          fi;
+          j = j + 1
+        done;
+        i = i + 1
+      done;
+      k = k + 1
+    done;
+    return 0
+  end
+
+  # --- Main Program ---
+  print "Floyd-Warshall 10-node Example in WACC\n";
+
+  int n = 10;
+  int INF = 99999;
+
+  # Initialize a 10x10 distance matrix with 99999 (infinity)
+  int[] row0 = [0, 3, INF, INF, INF, INF, INF, 8, INF, INF];
+  int[] row1 = [INF, 0, 2, INF, INF, INF, INF, INF, INF, INF];
+  int[] row2 = [INF, INF, 0, 1, INF, INF, INF, INF, INF, INF];
+  int[] row3 = [INF, INF, INF, 0, 4, INF, INF, INF, INF, INF];
+  int[] row4 = [INF, INF, INF, INF, 0, 2, INF, INF, INF, INF];
+  int[] row5 = [INF, INF, INF, INF, INF, 0, 3, INF, INF, INF];
+  int[] row6 = [INF, INF, INF, INF, INF, INF, 0, INF, 1, INF];
+  int[] row7 = [INF, INF, INF, INF, INF, INF, INF, 0, 2, INF];
+  int[] row8 = [INF, INF, INF, INF, INF, INF, INF, INF, 0, 1];
+  int[] row9 = [INF, INF, INF, INF, INF, INF, INF, INF, INF, 0];
+
+  int[][] dist = [row0,row1,row2,row3,row4,row5,row6,row7,row8,row9];
+
+  print "Initial distance matrix:\n";
+  int x = call print_matrix(dist, n, n);
+
+  # Compute all-pairs shortest paths
+  x = call floyd_warshall(dist, n);
+
+  print "Shortest distances after Floyd-Warshall:\n";
+  x = call print_matrix(dist, n, n)
+
+end

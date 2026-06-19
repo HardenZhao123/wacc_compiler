@@ -1,0 +1,33 @@
+# function overloading with same argument type but different order
+
+# Output:
+# 7
+# 207
+#
+
+# Program:
+
+begin
+  int mix(int x, bool y) is
+    if y then
+      return x
+    else
+      return -x
+    fi
+  end
+
+  int mix(bool y, int x) is
+    if y then
+      return x + 100
+    else
+      return x + 200
+    fi
+  end
+
+  int x = call mix(7, true);
+  println x;
+
+  int y = call mix(false, 7);
+  println y
+
+end

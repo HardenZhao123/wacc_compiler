@@ -1,0 +1,147 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Compile and run WACC programs for AArch64 and ARM32">
+    <meta name="theme-color" content="#09111f">
+    <title>WACC Compiler Studio</title>
+    <link rel="icon" href="/icon.svg" type="image/svg+xml">
+    <link rel="manifest" href="/manifest.webmanifest">
+    <link rel="stylesheet" href="/styles.css">
+  </head>
+  <body>
+    <header class="site-header">
+      <a class="brand" href="/" aria-label="WACC Compiler Studio home">
+        <span class="brand-mark" aria-hidden="true">W</span>
+        <span>
+          <strong>WACC</strong>
+          <small>Compiler Studio</small>
+        </span>
+      </a>
+      <div class="header-status" id="environmentStatus">
+        <span class="status-dot"></span>
+        <span>Checking local toolchain</span>
+      </div>
+    </header>
+
+    <main>
+      <section class="hero">
+        <div>
+          <p class="eyebrow">Interactive compiler</p>
+          <h1>Write WACC. Inspect assembly. Run it.</h1>
+        </div>
+        <p class="hero-copy">Target AArch64 or ARM32, compare optimised output, and execute programs from any modern browser.</p>
+      </section>
+
+      <section class="toolbar card" aria-label="Compiler options">
+        <div class="source-actions">
+          <label class="button button-secondary" for="fileInput">
+            <span>Open .wacc</span>
+          </label>
+          <input id="fileInput" type="file" accept=".wacc,text/plain" hidden>
+          <label class="select-wrap">
+            <span class="sr-only">Load example</span>
+            <select id="exampleSelect">
+              <option value="">Choose an example</option>
+            </select>
+          </label>
+        </div>
+
+        <fieldset class="option-group architecture-options">
+          <legend>Target architecture</legend>
+          <div class="segmented-control">
+            <label>
+              <input type="radio" name="architecture" value="aarch64" checked>
+              <span>AArch64</span>
+            </label>
+            <label>
+              <input type="radio" name="architecture" value="arm32">
+              <span>ARM32</span>
+            </label>
+          </div>
+        </fieldset>
+
+        <div class="option-group optimisation-option">
+          <span class="option-label">Optimisation</span>
+          <label class="switch-row">
+            <span>
+              <strong>Peephole</strong>
+              <small>Remove redundant instructions</small>
+            </span>
+            <input id="optimiseInput" type="checkbox" checked>
+            <span class="switch" aria-hidden="true"></span>
+          </label>
+        </div>
+      </section>
+
+      <section class="workspace">
+        <article class="panel card editor-panel">
+          <div class="panel-header">
+            <div>
+              <p class="panel-kicker">Source</p>
+              <h2 id="sourceTitle">program.wacc</h2>
+            </div>
+            <span class="language-chip">WACC</span>
+          </div>
+
+          <div class="editor-shell">
+            <pre id="lineNumbers" class="line-numbers" aria-hidden="true">1</pre>
+            <textarea id="sourceEditor" aria-label="WACC source code" spellcheck="false" autocomplete="off">begin
+  println "Hello World!"
+end</textarea>
+          </div>
+
+          <details class="stdin-panel">
+            <summary>Program input <span>stdin</span></summary>
+            <textarea id="stdinInput" aria-label="Program standard input" placeholder="Input consumed by read statements..."></textarea>
+          </details>
+
+          <div class="editor-actions">
+            <button id="compileButton" class="button button-secondary" type="button">Compile assembly</button>
+            <button id="runButton" class="button button-primary" type="button">
+              <span class="play-icon" aria-hidden="true">▶</span>
+              Compile &amp; run
+            </button>
+          </div>
+        </article>
+
+        <article class="panel card results-panel">
+          <div class="panel-header results-header">
+            <div>
+              <p class="panel-kicker">Build result</p>
+              <h2>Results</h2>
+            </div>
+            <span id="resultBadge" class="result-badge neutral">Ready</span>
+          </div>
+
+          <div class="tabs" role="tablist" aria-label="Compiler results">
+            <button class="tab active" role="tab" aria-selected="true" data-tab="output">Output</button>
+            <button class="tab" role="tab" aria-selected="false" data-tab="assembly">Assembly</button>
+            <button class="tab" role="tab" aria-selected="false" data-tab="log">Compiler log</button>
+          </div>
+
+          <div class="result-toolbar">
+            <span id="resultMeta">No build yet</span>
+            <div>
+              <button id="copyButton" class="icon-button" type="button" disabled>Copy</button>
+              <button id="downloadButton" class="icon-button" type="button" disabled>Download .s</button>
+            </div>
+          </div>
+
+          <div class="result-content">
+            <div id="emptyState" class="empty-state">
+              <span class="empty-glyph" aria-hidden="true">&lt;/&gt;</span>
+              <h3>Nothing to show yet</h3>
+              <p>Compile the program to generate assembly, or run it to see its output.</p>
+            </div>
+            <pre id="resultView" tabindex="0" hidden></pre>
+          </div>
+        </article>
+      </section>
+    </main>
+
+    <div id="toast" class="toast" role="status" aria-live="polite"></div>
+    <script src="/app.js" defer></script>
+  </body>
+</html>

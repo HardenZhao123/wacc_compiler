@@ -1,0 +1,15 @@
+services:
+  compiler-studio:
+    build: .
+    ports:
+      - "3000:3000"
+    init: true
+    read_only: true
+    mem_limit: 768m
+    pids_limit: 128
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    tmpfs:
+      - /tmp:size=256m,mode=1777

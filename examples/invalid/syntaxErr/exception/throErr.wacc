@@ -1,0 +1,10 @@
+# throw typo
+
+# Output:
+# #syntax_error#
+
+# Program:
+
+begin
+    thro BadCharException("bad char!")
+end

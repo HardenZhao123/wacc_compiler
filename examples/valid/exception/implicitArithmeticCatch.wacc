@@ -1,0 +1,21 @@
+# implicit divide-by-zero inside try should be catchable
+
+# Output:
+# caught arithmetic exception
+# divide or modulo by zero
+# survived
+
+# Program:
+
+begin
+  int n = 0;
+
+  try
+    int x = 10 / n
+  catch ArithmeticException err do
+    println "caught arithmetic exception";
+    println err
+  done;
+
+  println "survived"
+end
