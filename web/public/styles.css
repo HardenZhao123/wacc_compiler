@@ -204,6 +204,7 @@ select { min-width: 190px; padding: 0 36px 0 12px; color: var(--text); }
 .result-content { position: relative; flex: 1; min-height: 454px; background: #08111e; }
 .result-content pre { position: absolute; inset: 0; margin: 0; padding: 20px; overflow: auto; color: #d9e7f5; font: 13px/1.6 "SFMono-Regular", Consolas, monospace; white-space: pre-wrap; word-break: break-word; }
 .empty-state { min-height: 454px; padding: 40px; display: grid; place-content: center; justify-items: center; text-align: center; color: var(--muted); }
+.empty-state[hidden], #resultView[hidden] { display: none; }
 .empty-glyph { width: 56px; height: 56px; display: grid; place-items: center; margin-bottom: 15px; border: 1px solid var(--border); border-radius: 14px; color: var(--accent); background: rgba(98,230,191,0.06); font-family: monospace; font-weight: 800; }
 .empty-state h3 { margin: 0 0 8px; color: #dce6f0; font-size: 16px; }
 .empty-state p { max-width: 340px; margin: 0; font-size: 13px; line-height: 1.6; }
