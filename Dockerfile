@@ -3,8 +3,15 @@ FROM virtuslab/scala-cli:latest AS compiler-build
 WORKDIR /source
 COPY project.scala ./
 COPY src/main ./src/main
-RUN scala-cli --power package . --assembly --server=false --force \
-    --main-class wacc.Main -o /wacc-compiler.jar
+RUN scala-cli --power package . --server=false --graalvm-jvm-id graalvm-java21 \
+    --native-image --force --main-class wacc.Main -o /wacc-compiler -- \
+    --no-fallback --report-unsupported-elements-at-runtime
+
+RUN printf 'begin\n  println "native compiler ready"\nend\n' > /tmp/compiler-smoke.wacc \
+    && cd /tmp \
+    && /wacc-compiler /tmp/compiler-smoke.wacc --architecture aarch64 --peephole-optim \
+    && test -s /tmp/compiler-smoke.s \
+    && rm -f /tmp/compiler-smoke.wacc /tmp/compiler-smoke.s
 
 FROM node:22-bookworm-slim
 
@@ -14,7 +21,6 @@ RUN apt-get update \
       gcc-arm-linux-gnueabi \
       libc6-dev-arm64-cross \
       libc6-dev-armel-cross \
-      openjdk-17-jre-headless \
       qemu-user \
     && rm -rf /var/lib/apt/lists/*
 
@@ -26,15 +32,14 @@ RUN printf 'int main(void) { return 0; }\n' > /tmp/toolchain-smoke.c \
     && rm -f /tmp/toolchain-smoke.c /tmp/toolchain-aarch64 /tmp/toolchain-arm32
 
 WORKDIR /app
-COPY --from=compiler-build /wacc-compiler.jar ./wacc-compiler.jar
+COPY --from=compiler-build /wacc-compiler ./wacc-compiler
 COPY package.json ./
 COPY web ./web
 COPY examples ./examples
-COPY docker/wacc-compiler ./docker/wacc-compiler
 
 ENV HOST=0.0.0.0
 ENV PORT=3000
-ENV WACC_COMPILER=/app/docker/wacc-compiler
+ENV WACC_COMPILER=/app/wacc-compiler
 ENV MAX_CONCURRENT_JOBS=2
 ENV MAX_QUEUED_JOBS=20
 ENV RATE_LIMIT_REQUESTS=30
