@@ -5,6 +5,6 @@
 .vscode
 *.out
 *.s
-wacc-compiler
+/wacc-compiler
 WACC_Report.pdf
 WACC_Error_Report.pdf
