@@ -345,6 +345,14 @@ function toolchainStatus(architecture) {
   const missing = [];
   if (!compiler) missing.push(config.compiler);
   if (!emulator) missing.push(config.emulator);
+  if (!sysroot) {
+    missing.push(config.sysroot);
+  } else {
+    for (const objectFile of ["Scrt1.o", "crti.o"]) {
+      const objectPath = path.join(sysroot, "lib", objectFile);
+      if (!fs.existsSync(objectPath)) missing.push(objectPath);
+    }
+  }
 
   return {
     available: missing.length === 0,

@@ -12,9 +12,18 @@ RUN apt-get update \
     && apt-get install -y --no-install-recommends \
       gcc-aarch64-linux-gnu \
       gcc-arm-linux-gnueabi \
+      libc6-dev-arm64-cross \
+      libc6-dev-armel-cross \
       openjdk-17-jre-headless \
       qemu-user \
     && rm -rf /var/lib/apt/lists/*
+
+RUN printf 'int main(void) { return 0; }\n' > /tmp/toolchain-smoke.c \
+    && aarch64-linux-gnu-gcc /tmp/toolchain-smoke.c -o /tmp/toolchain-aarch64 \
+    && qemu-aarch64 -L /usr/aarch64-linux-gnu /tmp/toolchain-aarch64 \
+    && arm-linux-gnueabi-gcc /tmp/toolchain-smoke.c -o /tmp/toolchain-arm32 \
+    && qemu-arm -L /usr/arm-linux-gnueabi /tmp/toolchain-arm32 \
+    && rm -f /tmp/toolchain-smoke.c /tmp/toolchain-aarch64 /tmp/toolchain-arm32
 
 WORKDIR /app
 COPY --from=compiler-build /wacc-compiler.jar ./wacc-compiler.jar

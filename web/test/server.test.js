@@ -129,6 +129,9 @@ fs.writeFileSync(process.argv[outputIndex], "fake binary");
 process.stdin.resume();
 process.stdin.on("end", () => console.log("Hello from emulated WACC"));
 `, { mode: 0o755 });
+  await fs.mkdir(path.join(fakeDir, "lib"));
+  await fs.writeFile(path.join(fakeDir, "lib", "Scrt1.o"), "fake startup object");
+  await fs.writeFile(path.join(fakeDir, "lib", "crti.o"), "fake startup object");
 
   const previous = {
     gcc: process.env.WACC_AARCH64_GCC,
