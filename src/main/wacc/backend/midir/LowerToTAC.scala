@@ -86,6 +86,7 @@ object LowerToTAC {
       val rhs = lv.ty match {
         case SemInt => TACRead(lhs, ReadType.Int)
         case SemChar => TACRead(lhs, ReadType.Char)
+        case SemFloat => TACRead(lhs, ReadType.Float)
         case _ => throw new Exception(ERR_INVALID_READ_TYPE)
       }
       ftx.emit(rhs)
@@ -170,6 +171,7 @@ object LowerToTAC {
         case SemInt => PrintInt(rhs)
         case SemBool => PrintBool(rhs)
         case SemChar => PrintChar(rhs)
+        case SemFloat => PrintFloat(rhs)
         case SemString => PrintStr(rhs)
         case SemArray(SemChar, _) => PrintStr(rhs)
         case SemArray(_, _) => PrintPointer(rhs)
@@ -294,35 +296,58 @@ object LowerToTAC {
 
   private def lowerExpr(e: TypedExpr)(using ftx: FuncContext, lg: LabelGen, ctx: StringContext): Rhs = e match {
     case TypedExpr.IntLit(v) => ImmValue(v.toLong)
+    case TypedExpr.FloatLit(v) => FloatValue(v)
     case TypedExpr.BoolLit(value) => if value then ImmValue(1, BitLength._8) else ImmValue(0, BitLength._8)
     case TypedExpr.CharLit(value) => ImmValue(value.toLong, BitLength._8)
     case TypedExpr.StrLit(value) => ctx.getString(value)
     case TypedExpr.PairLit() => ImmValue(0, BitLength._ptr)
 
     // Arithmetic only uses checked variants when an enclosing try-catch can observe the thrown runtime exception.
-    case neg @ TypedExpr.Neg(operand) => if ftx.currentExceptionHandler.isDefined then lowerCheckedNeg(operand, neg.ty) else lowerUnaryOp(operand, neg.ty, UnaryOp.Neg)
+    case neg @ TypedExpr.Neg(operand) =>
+      if neg.ty == SemFloat then lowerBinaryOp(TypedExpr.FloatLit(0.0f), operand, SemFloat, FloatArithOp.Sub)
+      else if ftx.currentExceptionHandler.isDefined then lowerCheckedNeg(operand, neg.ty)
+      else lowerUnaryOp(operand, neg.ty, UnaryOp.Neg)
     case not @ TypedExpr.Not(operand) => lowerUnaryOp(operand, not.ty, UnaryOp.Not)
     case len @ TypedExpr.Len(operand) => lowerUnaryOp(operand, len.ty, UnaryOp.Len)
     case ord @ TypedExpr.Ord(operand) => lowerUnaryOp(operand, ord.ty, UnaryOp.Ord)
     case chr @ TypedExpr.Chr(operand) => lowerCheckedChr(operand, chr.ty)
     case bitNot @ TypedExpr.BitNot(operand) => lowerUnaryOp(operand, bitNot.ty, UnaryOp.BitNot)
 
-    case ba @ TypedExpr.BinaryArithmetic(left, right, op) => op match {
-      case TypedExpr.ArithmeticOperation.Add => if ftx.currentExceptionHandler.isDefined then lowerCheckedArithmetic(left, right, ba.ty, ArithOp.Add) else lowerBinaryOp(left, right, ba.ty, ArithOp.Add)
-      case TypedExpr.ArithmeticOperation.Sub => if ftx.currentExceptionHandler.isDefined then lowerCheckedArithmetic(left, right, ba.ty, ArithOp.Sub) else lowerBinaryOp(left, right, ba.ty, ArithOp.Sub)
-      case TypedExpr.ArithmeticOperation.Mul => if ftx.currentExceptionHandler.isDefined then lowerCheckedArithmetic(left, right, ba.ty, ArithOp.Mul) else lowerBinaryOp(left, right, ba.ty, ArithOp.Mul)
-      case TypedExpr.ArithmeticOperation.Div => lowerCheckedDivision(left, right, ba.ty, ArithOp.Div)
-      case TypedExpr.ArithmeticOperation.Mod => lowerCheckedDivision(left, right, ba.ty, ArithOp.Mod)
-    }
+    case ba @ TypedExpr.BinaryArithmetic(left, right, op) =>
+      if ba.ty == SemFloat then {
+        val floatOp = op match {
+          case TypedExpr.ArithmeticOperation.Add => FloatArithOp.Add
+          case TypedExpr.ArithmeticOperation.Sub => FloatArithOp.Sub
+          case TypedExpr.ArithmeticOperation.Mul => FloatArithOp.Mul
+          case TypedExpr.ArithmeticOperation.Div => FloatArithOp.Div
+          case TypedExpr.ArithmeticOperation.Mod => throw new Exception("float modulo is not supported")
+        }
+        lowerBinaryOp(left, right, ba.ty, floatOp)
+      } else op match {
+        case TypedExpr.ArithmeticOperation.Add => if ftx.currentExceptionHandler.isDefined then lowerCheckedArithmetic(left, right, ba.ty, ArithOp.Add) else lowerBinaryOp(left, right, ba.ty, ArithOp.Add)
+        case TypedExpr.ArithmeticOperation.Sub => if ftx.currentExceptionHandler.isDefined then lowerCheckedArithmetic(left, right, ba.ty, ArithOp.Sub) else lowerBinaryOp(left, right, ba.ty, ArithOp.Sub)
+        case TypedExpr.ArithmeticOperation.Mul => if ftx.currentExceptionHandler.isDefined then lowerCheckedArithmetic(left, right, ba.ty, ArithOp.Mul) else lowerBinaryOp(left, right, ba.ty, ArithOp.Mul)
+        case TypedExpr.ArithmeticOperation.Div => lowerCheckedDivision(left, right, ba.ty, ArithOp.Div)
+        case TypedExpr.ArithmeticOperation.Mod => lowerCheckedDivision(left, right, ba.ty, ArithOp.Mod)
+      }
 
-    case bc @ TypedExpr.BinaryCompare(left, right, op) => op match {
-      case TypedExpr.CompareOperation.Less => lowerBinaryOp(left, right, bc.ty, CondOp.LT)
-      case TypedExpr.CompareOperation.LessEqual => lowerBinaryOp(left, right, bc.ty, CondOp.LEQ)
-      case TypedExpr.CompareOperation.Greater => lowerBinaryOp(left, right, bc.ty, CondOp.GT)
-      case TypedExpr.CompareOperation.GreaterEqual => lowerBinaryOp(left, right, bc.ty, CondOp.GEQ)
-      case TypedExpr.CompareOperation.Equal => lowerBinaryOp(left, right, bc.ty, CondOp.EQ)
-      case TypedExpr.CompareOperation.NotEqual => lowerBinaryOp(left, right, bc.ty, CondOp.NEQ)
-    }
+    case bc @ TypedExpr.BinaryCompare(left, right, op) =>
+      val comparisonOp: BinaryOp = if left.ty == SemFloat then op match {
+        case TypedExpr.CompareOperation.Less => FloatCondOp.LT
+        case TypedExpr.CompareOperation.LessEqual => FloatCondOp.LEQ
+        case TypedExpr.CompareOperation.Greater => FloatCondOp.GT
+        case TypedExpr.CompareOperation.GreaterEqual => FloatCondOp.GEQ
+        case TypedExpr.CompareOperation.Equal => FloatCondOp.EQ
+        case TypedExpr.CompareOperation.NotEqual => FloatCondOp.NEQ
+      } else op match {
+        case TypedExpr.CompareOperation.Less => CondOp.LT
+        case TypedExpr.CompareOperation.LessEqual => CondOp.LEQ
+        case TypedExpr.CompareOperation.Greater => CondOp.GT
+        case TypedExpr.CompareOperation.GreaterEqual => CondOp.GEQ
+        case TypedExpr.CompareOperation.Equal => CondOp.EQ
+        case TypedExpr.CompareOperation.NotEqual => CondOp.NEQ
+      }
+      lowerBinaryOp(left, right, bc.ty, comparisonOp)
 
     case bb @ TypedExpr.BinaryBitwise(left, right, op) => op match {
       case TypedExpr.BitwiseAndOr.BitAnd => lowerBinaryOp(left, right, bb.ty, BitwiseOp.BitAnd)
@@ -500,7 +525,7 @@ object LowerToTAC {
   private def lowerFor(init: List[TypedStmt], cond: TypedExpr, update: List[TypedStmt], body: List[TypedStmt])
                       (using ftx: FuncContext, lg: LabelGen, ctx: StringContext): Unit = {
     val lHead = lg.fresh(WHILE_LABEL_HEAD)
-    val lUpdate = lg.fresh("for_update")
+    val lUpdate = lg.fresh(FOR_UPDATE)
     val lEnd = lg.fresh(WHILE_LABEL_END)
 
     // `continue` targets the update block, matching source-level for-loop semantics.
@@ -524,7 +549,7 @@ object LowerToTAC {
   private def lowerDoWhile(body: List[TypedStmt], cond: TypedExpr)
                           (using ftx: FuncContext, lg: LabelGen, ctx: StringContext): Unit = {
     val lHead = lg.fresh(WHILE_LABEL_HEAD)
-    val lCond = lg.fresh("do_while_cond")
+    val lCond = lg.fresh(DO_WHILE_COND)
     val lEnd = lg.fresh(WHILE_LABEL_END)
 
     // Do-while uses a separate continue label so `continue` jumps to the trailing condition check, not the body start.

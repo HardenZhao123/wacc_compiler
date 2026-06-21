@@ -60,6 +60,7 @@ final class FuncContext(val isMain: Boolean, val returnType: Option[SemanticType
   def defaultReturnValue: Rhs = returnType match {
     // Non-void functions that fall off the end still need a backend value of the right machine width.
     case Some(SemInt) => ImmValue(0)
+    case Some(SemFloat) => FloatValue(0.0)
     case Some(SemBool) => ImmValue(0, BitLength._8)
     case Some(SemChar) => ImmValue(0, BitLength._8)
     case Some(_) => ImmValue(0, BitLength._ptr)

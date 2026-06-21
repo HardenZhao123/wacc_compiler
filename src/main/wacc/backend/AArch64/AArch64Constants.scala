@@ -66,6 +66,8 @@ object AArch64Constants {
 
   val _PRINTB = "_printb"
 
+  val _PRINTFL = "_printfl"
+
   val _PRINTLN = "_println"
 
   val _PRINTC = "_printc"
@@ -75,6 +77,8 @@ object AArch64Constants {
   val _READI = "_readi"
 
   val _READC = "_readc"
+
+  val _READFL = "_readfl"
 
   val _FREEPAIR = "_freepair"
 

@@ -61,4 +61,3 @@ object RenamerErrorFormat {
     errors.map(e => renderOne(file, input, e)).mkString("\n\n")
   }
 }
-

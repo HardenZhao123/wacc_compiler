@@ -21,6 +21,7 @@ object TAC {
   final case class PrintInt(content: Rhs) extends Print
   final case class PrintChar(content: Rhs) extends Print
   final case class PrintBool(content: Rhs) extends Print
+  final case class PrintFloat(content: Rhs) extends Print
   final case class PrintStr(content: Rhs) extends Print
   final case class PrintPointer(content: Rhs) extends Print
   final case class PrintLn() extends Instr
@@ -43,6 +44,13 @@ object TAC {
   // Values
   sealed trait Rhs { def len: BitLength }
   final case class ImmValue(value: Long, len: BitLength = BitLength._32) extends Rhs
+  final case class FloatValue(value: Float, len: BitLength = BitLength._32) extends Rhs {
+    def rawBits: Int =
+      java.lang.Float.floatToRawIntBits(value)
+
+    def rawBitsAsLong: Long =
+      rawBits & 0xffffffffL
+  }
   final case class TACStr(id: Int, len: BitLength = BitLength._ptr) extends Rhs
   final case class Pair(fst: Rhs, snd: Rhs, len: BitLength = BitLength._ptr) extends Rhs
   final case class Array(elems: List[Rhs], len: BitLength) extends Rhs
@@ -72,6 +80,7 @@ object TAC {
   def sizeof(semType: SemanticType): BitLength = semType match {
     // Aggregate values lower to pointers because the runtime layout lives on the heap.
     case SemanticType.SemInt => BitLength._32
+    case SemanticType.SemFloat => BitLength._32
     case SemanticType.SemBool => BitLength._8
     case SemanticType.SemChar => BitLength._8
     case SemanticType.SemString => BitLength._ptr
@@ -88,7 +97,15 @@ object TAC {
     case Add, Sub, Mul, Div, Mod
   }
 
+  enum FloatArithOp extends BinaryOp {
+    case Add, Sub, Mul, Div
+  }
+
   enum CondOp extends BinaryOp {
+    case EQ, NEQ, LT, GT, LEQ, GEQ
+  }
+
+  enum FloatCondOp extends BinaryOp {
     case EQ, NEQ, LT, GT, LEQ, GEQ
   }
 
@@ -114,7 +131,7 @@ object TAC {
   final case class TACReturn(value: Rhs) extends Instr
 
   enum ReadType {
-    case Int, Char
+    case Int, Char, Float
   }
 
   final case class TACCall(dst: Temp, func: Label, args: List[Rhs]) extends Instr

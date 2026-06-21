@@ -98,6 +98,23 @@ class LexerCharTest extends AnyFlatSpec {
   it should "ignore a trailing comment after the token" in { assertChar("'x' # comment", 'x') }
 }
 
+class LexerFloatTest extends AnyFlatSpec {
+  private val lex = lexer
+
+  private def assertFloat(input: String, expected: Float): Unit = {
+    val r = lex.fully(lex.float).parse(input)
+    r match {
+      case parsley.Success(value) => value.shouldBe(expected)
+      case parsley.Failure(_)     => fail("Expected successful float parse")
+    }
+  }
+
+  "float lexer" should "parse a normal floating-point number" in { assertFloat("1.5444", 1.5444) }
+  it should "parse a negative floating-point number" in { assertFloat("-1.544", -1.544) }
+  it should "parse Float.MaxValue" in { assertFloat("3.4028235E38", 3.4028235E38) }
+  it should "parse Float.MinValue" in { assertFloat("-3.4028235E38", -3.4028235E38) }
+}
+
 class LexerIdentifierTest extends AnyFlatSpec {
 
   private val lex = lexer

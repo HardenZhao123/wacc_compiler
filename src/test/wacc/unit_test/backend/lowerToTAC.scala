@@ -91,6 +91,7 @@ final class LowerToTACTest extends AnyFunSuite {
           case TAC.PrintInt(content)     => TAC.PrintInt(mapRhs(content))
           case TAC.PrintChar(content)    => TAC.PrintChar(mapRhs(content))
           case TAC.PrintBool(content)    => TAC.PrintBool(mapRhs(content))
+          case TAC.PrintFloat(content)   => TAC.PrintFloat(mapRhs(content))
           case TAC.PrintStr(content)     => TAC.PrintStr(mapRhs(content))
           case TAC.PrintPointer(content) => TAC.PrintPointer(mapRhs(content))
         }
@@ -127,6 +128,38 @@ final class LowerToTACTest extends AnyFunSuite {
   test("LowerToTAC: exit(IntLit) lowers to TAC.Exit(ImmInt)") {
     val got = lower(List(Exit(IntLit(7))))
     assert(got == TAC.TACProgram(Seq(), Seq(), Seq(TAC.TACExit(TAC.ImmValue(7))), Seq()))
+  }
+
+  test("LowerToTAC: float arithmetic uses float-specific TAC operations") {
+    val expr = BinaryArithmetic(FloatLit(1.5f), FloatLit(2.25f), ArithmeticOperation.Add)
+    val got = lower(List(Print(expr)))
+    val temp = TAC.Temp(0, TAC.BitLength._32)
+    val expect = TAC.TACProgram(Seq(), Seq(), Seq(
+      TAC.BinOp(temp, TAC.FloatArithOp.Add, TAC.FloatValue(1.5f), TAC.FloatValue(2.25f)),
+      TAC.PrintFloat(temp)
+    ), Seq(temp))
+    assert(got == expect)
+  }
+
+  test("LowerToTAC: float negation is lowered as zero minus the operand") {
+    val got = lower(List(Print(Neg(FloatLit(3.5f)))))
+    assert(got.body.head == TAC.BinOp(
+      TAC.Temp(0, TAC.BitLength._32),
+      TAC.FloatArithOp.Sub,
+      TAC.FloatValue(0.0f),
+      TAC.FloatValue(3.5f)
+    ))
+  }
+
+  test("LowerToTAC: float comparisons use float-specific TAC operations") {
+    val expr = BinaryCompare(FloatLit(1.0f), FloatLit(2.0f), CompareOperation.Less)
+    val got = lower(List(Print(expr)))
+    assert(got.body.head == TAC.BinOp(
+      TAC.Temp(0, TAC.BitLength._8),
+      TAC.FloatCondOp.LT,
+      TAC.FloatValue(1.0f),
+      TAC.FloatValue(2.0f)
+    ))
   }
 
   test("LowerToTAC: begin-end is flattened") {
@@ -742,6 +775,5 @@ final class LowerToTACTest extends AnyFunSuite {
     assert(body.exists { case TAC.PrintInt(_) => true; case _ => false })
   }
 }
-
 
 

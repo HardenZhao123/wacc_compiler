@@ -1,0 +1,14 @@
+# Echo a single-precision floating-point value
+
+# Input: 2.25
+
+# Output:
+# 2.25
+
+# Program:
+
+begin
+  float value = 0.0;
+  read value;
+  println value
+end

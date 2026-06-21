@@ -154,6 +154,12 @@ object A64Generator {
 
     case BinOp(dst, op, lhs, rhs) =>
       op match {
+        case f: TAC.FloatArithOp =>
+          emitFloatArithmetic(dst, f, lhs, rhs)
+
+        case c: TAC.FloatCondOp =>
+          emitFloatComparison(dst, c, lhs, rhs)
+
         case TAC.ArithOp.Mul =>
           emitMul(dst, lhs, rhs)
 
@@ -258,6 +264,7 @@ object A64Generator {
           case _: PrintInt     => emitPrint(_PRINTI)
           case _: PrintBool    => emitPrint(_PRINTB)
           case _: PrintChar    => emitPrint(_PRINTC)
+          case _: PrintFloat   => emitPrint(_PRINTFL)
           case _: PrintStr     => emitPrint(_PRINTS)
           case _: PrintPointer => emitPrint(_PRINTP)
         }
@@ -276,6 +283,9 @@ object A64Generator {
         case TAC.ReadType.Char =>
           gr.emit(Bl(Label(_READC)))
           gr.addPreDefs(_READC)
+        case TAC.ReadType.Float =>
+          gr.emit(Bl(Label(_READFL)))
+          gr.addPreDefs(_READFL)
       }
 
       //store result back
@@ -339,6 +349,49 @@ object A64Generator {
         gr.emit(Ldr(dataReg, MemAddress.BaseRegAddress(addr)))
         cs.frame.storeTemp(dst, dataReg, cs.ra)
       }
+    }
+
+  private def emitFloatArithmetic(dst: TAC.Temp, op: TAC.FloatArithOp, lhs: TAC.Rhs, rhs: TAC.Rhs)
+                                 (using cs: A64CodegenState, gr: GenRes): Unit =
+    cs.withEval2(lhs, rhs) { (lhsReg, rhsReg) =>
+      val lhsW = toW(lhsReg)
+      val rhsW = toW(rhsReg)
+      val result = S(0)
+      val operand = S(1)
+
+      gr.emit(FMov(result, lhsW))
+      gr.emit(FMov(operand, rhsW))
+      op match {
+        case TAC.FloatArithOp.Add => gr.emit(FAdd(result, result, operand))
+        case TAC.FloatArithOp.Sub => gr.emit(FSub(result, result, operand))
+        case TAC.FloatArithOp.Mul => gr.emit(FMul(result, result, operand))
+        case TAC.FloatArithOp.Div => gr.emit(FDiv(result, result, operand))
+      }
+      gr.emit(FMov(lhsW, result))
+      cs.frame.storeTemp(dst, lhsW, cs.ra)
+    }
+
+  private def emitFloatComparison(dst: TAC.Temp, op: TAC.FloatCondOp, lhs: TAC.Rhs, rhs: TAC.Rhs)
+                                 (using cs: A64CodegenState, gr: GenRes): Unit =
+    cs.withEval2(lhs, rhs) { (lhsReg, rhsReg) =>
+      val lhsW = toW(lhsReg)
+      val left = S(0)
+      val right = S(1)
+
+      gr.emit(FMov(left, lhsW))
+      gr.emit(FMov(right, toW(rhsReg)))
+      gr.emit(FCmp(left, right))
+
+      val cond = op match {
+        case TAC.FloatCondOp.EQ => Cond.EQ
+        case TAC.FloatCondOp.NEQ => Cond.NE
+        case TAC.FloatCondOp.LT => Cond.MI
+        case TAC.FloatCondOp.LEQ => Cond.LS
+        case TAC.FloatCondOp.GT => Cond.GT
+        case TAC.FloatCondOp.GEQ => Cond.GE
+      }
+      gr.emit(Cset(lhsW, cond))
+      cs.frame.storeTemp(dst, lhsW, cs.ra)
     }
 
   // Rounds stack allocation size up to the AArch64 16-byte alignment rule.

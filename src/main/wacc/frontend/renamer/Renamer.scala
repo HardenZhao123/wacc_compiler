@@ -206,7 +206,7 @@ object Renamer {
   private def renameExpr(e: Expr, funcs: Map[String, PositionInfo])(using ctx: RenamerScope, st: RenamerState): Expr = e match {
 
     // atoms
-    case IntLiter(_) | BooleanLiter(_) | CharLiter(_) | StringLiter(_) | PairLiter() => e
+    case IntLiter(_) | BooleanLiter(_) | CharLiter(_) | FloatLiter(_) | StringLiter(_) | PairLiter() => e
     case id: Identifier => RenamerScope.fromScope(id)
     case ae: ArrayElem => renameArrayElem(ae, funcs)
     case Parens(inner) => Parens(renameExpr(inner, funcs))(e.positionInfo)
@@ -260,5 +260,3 @@ object Renamer {
     CatchHandler(h.exType, exName2, body2)(h.positionInfo)
   }
 }
-
-

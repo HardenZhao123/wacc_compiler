@@ -17,6 +17,15 @@ final case class W(n: Int) extends A64Reg {
   val name: String = s"w$n"
 }
 
+// Scalar floating-point register views used by float code generation.
+final case class S(n: Int) extends A64Operand with Register {
+  val name: String = s"s$n"
+}
+
+final case class D(n: Int) extends A64Operand with Register {
+  val name: String = s"d$n"
+}
+
 // Special registers
 case object SP extends A64Reg { val name = "sp" }   // stack pointer
 case object FP extends A64Reg { val name = "fp" }   // frame pointer

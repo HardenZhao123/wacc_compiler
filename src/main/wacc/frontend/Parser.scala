@@ -4,8 +4,7 @@ import parsley.{Parsley, Result}
 import parsley.expr.{InfixL, InfixN, InfixR, Prefix, SOps, precedence}
 import parsley.quick.{atomic, many, pure, some}
 import lexer.implicits.given
-import lexer.{boolean, char, fully, identifier, implicits, integer, string}
-
+import lexer.{boolean, char, float, fully, identifier, implicits, integer, string}
 import wacc.frontend.ast.*
 import wacc.frontend.ast.Expr.*
 import wacc.frontend.ast.Stmt.*
@@ -42,6 +41,7 @@ object parser {
     private lazy val boolAtom: Parsley[Expr] = Expr.BooleanLiter(boolean)
     private lazy val charAtom: Parsley[Expr] = Expr.CharLiter(char)
     private lazy val stringAtom: Parsley[Expr] = Expr.StringLiter(string)
+    private lazy val floatAtom: Parsley[Expr] = Expr.FloatLiter(float)
     private lazy val pairAtom: Parsley[Expr] = withPos("null") { (_, p) => PairLiter()(p) }
     private lazy val identP: Parsley[Identifier] = Expr.Identifier(identifier)
     private lazy val identifierAtom: Parsley[Expr] = identP.map(id => id: Expr)
@@ -51,7 +51,7 @@ object parser {
     private lazy val parensAtom: Parsley[Expr] = Expr.Parens("(" ~> expr <~ ")")
 
     private lazy val atom: Parsley[Expr] =
-        intAtom <|> boolAtom <|> charAtom <|> stringAtom
+        floatAtom <|> intAtom <|> boolAtom <|> charAtom <|> stringAtom
     <|> pairAtom <|> atomic(arrayAtom) <|> identifierAtom
     <|> parensAtom
 
@@ -99,6 +99,7 @@ object parser {
         baseTypeKW("int", IntType()) <|>
           baseTypeKW("bool", BoolType()) <|>
           baseTypeKW("char", CharType()) <|>
+          baseTypeKW("float", FloatType()) <|>
           baseTypeKW("string", StringType())
 
     private lazy val oneDim: Parsley[Unit] = "[" *> "]"
@@ -289,5 +290,3 @@ object parser {
     // Program is: begin, zero-or-more function declarations, then the main body, then end.
     private lazy val program: Parsley[Program] = Program("begin" ~> many(funcP), stmtP <~ "end")
 }
-
-

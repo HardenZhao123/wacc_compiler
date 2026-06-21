@@ -4,4 +4,3 @@ package wacc.backend.label
 final case class Label(name: String) extends AnyVal {
   override def toString: String = name
 }
-

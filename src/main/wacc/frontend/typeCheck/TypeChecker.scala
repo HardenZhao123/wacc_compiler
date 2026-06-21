@@ -124,6 +124,7 @@ object TypeChecker {
     case SemInt => "I"
     case SemBool => "B"
     case SemChar => "C"
+    case SemFloat => "F"
     case SemString => "S"
     case SemUnknown => "U"
     case SemPairErased => "PE"

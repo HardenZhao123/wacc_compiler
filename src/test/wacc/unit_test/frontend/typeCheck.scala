@@ -105,6 +105,40 @@ class TypeCheckerTest extends AnyFlatSpec {
     shouldExit(src, ExitCode.SemanticError)
   }
 
+  it should "accept float arithmetic, negation and comparisons" in {
+    val src =
+      """
+      begin
+        float x = 1.5;
+        float y = 2.0;
+        float z = -(x + y * 3.0) / 2.0;
+        bool ordered = z <= x;
+        bool equal = x == 1.5
+      end
+      """
+    shouldExit(src, ExitCode.Success)
+  }
+
+  it should "reject mixed int and float arithmetic" in {
+    val src =
+      """
+      begin
+        float x = 1.5 + 1
+      end
+      """
+    shouldExit(src, ExitCode.SemanticError)
+  }
+
+  it should "reject modulo on floats" in {
+    val src =
+      """
+      begin
+        float x = 3.5 % 2.0
+      end
+      """
+    shouldExit(src, ExitCode.SemanticError)
+  }
+
   it should "accept char comparisons" in {
     val src =
       """
@@ -183,14 +217,16 @@ class TypeCheckerTest extends AnyFlatSpec {
     shouldExit(src, ExitCode.SemanticError)
   }
 
-  it should "accept read into int and char" in {
+  it should "accept read into int, char and float" in {
     val src =
       """
       begin
         int x = 0;
         char c = 'a';
+        float f = 1.0;
         read x;
-        read c
+        read c;
+        read f
       end
       """
     shouldExit(src, ExitCode.Success)
@@ -525,6 +561,18 @@ class TypeCheckerTest extends AnyFlatSpec {
       """
     shouldExit(src, ExitCode.Success)
   }
+
+  it should "reject a non-boolean for-loop condition" in {
+    val src =
+      """
+      begin
+        for (int x = 1, x + 1, x = x + 1)
+          skip
+        done
+      end
+      """
+    shouldExit(src, ExitCode.SemanticError)
+  }
   
   it should "accept a basic do-while loop" in {
     val src =
@@ -681,5 +729,3 @@ class TypeCheckerTest extends AnyFlatSpec {
     shouldExit(src, ExitCode.SemanticError)
   }
 }
-
-

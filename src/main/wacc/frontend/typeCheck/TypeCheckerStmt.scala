@@ -101,13 +101,13 @@ object TypeCheckerStmt {
     // Read statement
     case Read(lhs) =>
 
-      // l-value must have type int or char
+      // l-value must have a scalar type supported by the runtime input helpers
       val (rawTyOpt, lhsTypedLValue) = TypeCheckerLR.checkLValue(lhs, Constraint.UnConstraint)
       rawTyOpt match {
-        case Some(SemInt) | Some(SemChar) => ()
+        case Some(SemInt) | Some(SemChar) | Some(SemFloat) => ()
         case Some(SemUnknown) => ctx.addError(CannotInferType(stmt.positionInfo))
         case Some(otherTy) =>
-          ctx.addError(TypeMismatch("int or char", SemanticType.show(otherTy), stmt.positionInfo))
+          ctx.addError(TypeMismatch("int, char or float", SemanticType.show(otherTy), stmt.positionInfo))
         case None =>
           ctx.addError(CannotInferType(stmt.positionInfo))
       }
@@ -196,15 +196,21 @@ object TypeCheckerStmt {
       Some(TypedStmt.TryCatch(tryTypedStmts, typedHandlers))
 
     case For(init, cond, update, body) =>
-      // The three statement positions share loop depth accounting, but they are still checked in source order.
-      val (_, condTypedExpr) = TypeCheckerExpr.checkExpr(cond, Constraint.Is(SemBool))
-
-      val (initTypedStmts, updateTypedStmts, bodyTypedStmts) = withLoopDepth {
-        val initTyped = checkStmtHelper(init)
-        val updateTyped = checkStmtHelper(update)
-        val bodyTyped = checkStmtHelper(body)
-        (initTyped, updateTyped, bodyTyped)
-      }
+      // The initializer introduces bindings that are visible to the condition,
+      // update and body, but the entire loop scope must not escape afterwards.
+      val oldEnv = ctx.env
+      val (initTypedStmts, condTypedExpr, updateTypedStmts, bodyTypedStmts) =
+        try {
+          withLoopDepth {
+            val initTyped = checkStmtHelper(init)
+            val (_, condTyped) = TypeCheckerExpr.checkExpr(cond, Constraint.Is(SemBool))
+            val updateTyped = checkStmtHelper(update)
+            val bodyTyped = checkStmtHelper(body)
+            (initTyped, condTyped, updateTyped, bodyTyped)
+          }
+        } finally {
+          ctx.env = oldEnv
+        }
 
       Some(TypedStmt.For(initTypedStmts, condTypedExpr, updateTypedStmts, bodyTypedStmts))
 

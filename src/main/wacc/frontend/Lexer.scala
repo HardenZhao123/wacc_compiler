@@ -10,7 +10,7 @@ object lexer {
     // Set of  keywords that cannot be used as identifiers
     // and are recognised directly by the lexer.
     private final val hardKeyWords: Set[String] = Set(
-        "int", "char", "string", "bool", "pair", "null",
+        "int", "char", "float", "string", "bool", "pair", "null",
         "true", "false", "begin", "end", "is", "skip",
         "read", "free", "return", "throw", "exit", "print", "println",
         "if", "then", "else", "fi", "while", "do", "done",
@@ -87,6 +87,7 @@ object lexer {
 
     val identifier: Parsley[String] = lexer.lexeme.names.identifier
     val integer: Parsley[Int] = lexer.lexeme.integer.decimal32[Int]
+    val float: Parsley[Float] = lexer.lexeme.floating.float
     val char: Parsley[Char] = lexer.lexeme.character.ascii
     val string: Parsley[String] = lexer.lexeme.string.ascii
     val boolean: Parsley[Boolean] = lexer.lexeme.symbol("true").as(true) |
@@ -94,4 +95,3 @@ object lexer {
     val implicits: ImplicitSymbol = lexer.lexeme.symbol.implicits
     def fully[A](p: Parsley[A]): Parsley[A] = lexer.fully(p)
 }
-
