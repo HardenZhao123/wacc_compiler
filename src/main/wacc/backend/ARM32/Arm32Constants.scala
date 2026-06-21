@@ -10,6 +10,8 @@ object Arm32Constants {
 
   val R2_REG = A32Registers.R2
 
+  val R3_REG = A32Registers.R3
+
   val SCRATCH_REG_START = A32Registers.R4
 
   val ARG_REG_COUNT = 4
@@ -35,13 +37,13 @@ object Arm32Constants {
   val NULL_PTR = 0L
 
   val MAX_INT_ARM32 = 256
-  
+
   val BoolCharSize = 1
-  
+
   val OverflowCheck = 31
-  
+
   val POOP_INTERVAL = 120
-  
+
   val _EXIT = "_exit"
 
   val _PRINTI = "_printi"
@@ -49,6 +51,8 @@ object Arm32Constants {
   val _PRINTS = "_prints"
 
   val _PRINTB = "_printb"
+
+  val _PRINTFL = "_printfl"
 
   val _PRINTLN = "_println"
 
@@ -60,6 +64,8 @@ object Arm32Constants {
 
   val _READC = "_readc"
 
+  val _READFL = "_readfl"
+
   val _FREE = "_free"
 
   val _FREEPAIR = "_freepair"
@@ -69,6 +75,24 @@ object Arm32Constants {
   val _ERR_UNHANDLED = "_errUnhandled"
   
   val AEABI_IDIVMOD = "__aeabi_idivmod"
+
+  val AEABI_FADD = "__aeabi_fadd"
+
+  val AEABI_FSUB = "__aeabi_fsub"
+
+  val AEABI_FMUL = "__aeabi_fmul"
+
+  val AEABI_FDIV = "__aeabi_fdiv"
+
+  val AEABI_FCMPEQ = "__aeabi_fcmpeq"
+
+  val AEABI_FCMPLT = "__aeabi_fcmplt"
+
+  val AEABI_FCMPLE = "__aeabi_fcmple"
+
+  val AEABI_FCMPGT = "__aeabi_fcmpgt"
+
+  val AEABI_FCMPGE = "__aeabi_fcmpge"
   
   val A32_POOP_SKIP = "a32_pool_skip"
   

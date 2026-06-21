@@ -97,6 +97,16 @@ final class StackFrame(stackSlots: Seq[Temp]) extends CommonStackFrame {
         gr.emit(Movk(toW(into), Immediate(high16), LSL(Immediate(MOVK_SHIFT_HALFWORD))))
       }
 
+    case FloatValue(v, _) =>
+      val bits = java.lang.Float.floatToRawIntBits(v) & 0xffffffffL
+      val low16 = bits & MASK_16
+      val high16 = (bits >> SHIFT_16) & MASK_16
+
+      gr.emit(Mov(toW(into), Immediate(low16)))
+      if (high16 != 0) {
+        gr.emit(Movk(toW(into), Immediate(high16), LSL(Immediate(MOVK_SHIFT_HALFWORD))))
+      }
+
     case TACStr(id, _) =>
       val label = Label(s".str_$id")
 

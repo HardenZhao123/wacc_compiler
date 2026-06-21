@@ -13,12 +13,14 @@ object preDefHelpersConstant {
   val LBL_PRINTLN_STR0 = ".L._println_str0"
   val LBL_READI_STR0 = ".L._readi_str0"
   val LBL_READC_STR0 = ".L._readc_str0"
+  val LBL_READFL_STR0 = ".L._readfl_str0"
 
   val FMT_INT_D = "%d"
   val FMT_CHAR_C = "%c"
   val FMT_PTR_P = "%p"
   val FMT_LEN_STR = "%.*s"
   val FMT_SCAN_CHAR_SPACE_C = " %c"
+  val FMT_FLOAT_F = "%f"
 
   val STR_FALSE = "false"
   val STR_TRUE = "true"
@@ -58,4 +60,8 @@ object preDefHelpersConstant {
   val ASM_DIRECTIVE_ASCIZ_WITH_INDENT = "\t.asciz "
   
   val LBL_ERR_UNHANDLED_PREFIX = "LBL_ERR_UNHANDLED_PREFIX"
+
+  val LBL_PRINTFL_STR0 = ".L._printfl_str0"
+  val FMT_FLOAT_G = "%g"
+  val LIBC_FLOAT_TO_DOUBLE = "__aeabi_f2d"
 }

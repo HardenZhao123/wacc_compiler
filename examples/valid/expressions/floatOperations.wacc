@@ -1,0 +1,29 @@
+# Float arithmetic, comparisons, function calls, arrays, pairs and printing
+
+# Output:
+# 3.5
+# -3.5
+# 3.5
+# 1.5
+# true
+
+# Program:
+
+begin
+  float add(float x, float y) is
+    return x + y
+  end
+
+  float x = 1.5;
+  float y = 2.0;
+  float result = call add(x, y);
+  float[] values = [result, -result];
+  pair(float, float) bounds = newpair(x, y);
+  float lower = fst bounds;
+
+  println result;
+  println values[1];
+  println values[0];
+  println lower;
+  println result > y
+end

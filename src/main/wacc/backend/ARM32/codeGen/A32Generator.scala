@@ -195,6 +195,8 @@ object A32Generator {
                 gr.emit(Mov(lreg, R1_REG))
             }
 
+          case f: TAC.FloatArithOp => emitFloatArithmetic(f, lreg, rreg)
+
           // Boolean ops 
           case b: TAC.BoolOp =>
             b match {
@@ -204,6 +206,8 @@ object A32Generator {
 
           // Comparison ops: result 0/1 
           case c: TAC.CondOp => emitComparison(c, lreg, rreg)
+
+          case c: TAC.FloatCondOp => emitFloatComparison(c, lreg, rreg)
 
           // Bitwise operations 
           case TAC.BitwiseOp.BitAnd => emitOverflowInstr(And.apply, lreg, rreg)
@@ -272,6 +276,7 @@ object A32Generator {
           case _: PrintInt     => emitPrint(_PRINTI) // Print integer
           case _: PrintBool    => emitPrint(_PRINTB) // Print boolean
           case _: PrintChar    => emitPrint(_PRINTC) // Print character
+          case _: PrintFloat   => emitPrint(_PRINTFL) // Print float
           case _: PrintStr     => emitPrint(_PRINTS) // Print string
           case _: PrintPointer => emitPrint(_PRINTP) // Print pointer
         }
@@ -288,6 +293,9 @@ object A32Generator {
         case TAC.ReadType.Char =>
           gr.emit(Bl(Label(_READC)))
           gr.addPreDefs(_READC)
+        case TAC.ReadType.Float =>
+          gr.emit(Bl(Label(_READFL)))
+          gr.addPreDefs(_READFL)
       }
 
       cs.frame.storeTemp(dest, RETURN_REG)
@@ -351,6 +359,44 @@ object A32Generator {
   private def emitPrint(printLabel: String)(using gr: GenRes): Unit = {
     gr.emit(Bl(Label(printLabel)))
     gr.addPreDefs(printLabel)
+  }
+
+  private def emitFloatArithmetic(op: TAC.FloatArithOp, lhs: A32Reg, rhs: A32Reg)
+                                 (using gr: GenRes): Unit = {
+    val helper = op match {
+      case TAC.FloatArithOp.Add => AEABI_FADD
+      case TAC.FloatArithOp.Sub => AEABI_FSUB
+      case TAC.FloatArithOp.Mul => AEABI_FMUL
+      case TAC.FloatArithOp.Div => AEABI_FDIV
+    }
+
+    gr.emit(Mov(RETURN_REG, lhs))
+    gr.emit(Mov(R1_REG, rhs))
+    gr.emit(Bl(Label(helper)))
+    gr.emit(Mov(lhs, RETURN_REG))
+  }
+
+  private def emitFloatComparison(op: TAC.FloatCondOp, lhs: A32Reg, rhs: A32Reg)
+                                 (using gr: GenRes): Unit = {
+    val helper = op match {
+      case TAC.FloatCondOp.EQ | TAC.FloatCondOp.NEQ => AEABI_FCMPEQ
+      case TAC.FloatCondOp.LT => AEABI_FCMPLT
+      case TAC.FloatCondOp.LEQ => AEABI_FCMPLE
+      case TAC.FloatCondOp.GT => AEABI_FCMPGT
+      case TAC.FloatCondOp.GEQ => AEABI_FCMPGE
+    }
+
+    gr.emit(Mov(RETURN_REG, lhs))
+    gr.emit(Mov(R1_REG, rhs))
+    gr.emit(Bl(Label(helper)))
+
+    if (op == TAC.FloatCondOp.NEQ) {
+      gr.emit(Cmp(RETURN_REG, Immediate(0)))
+      gr.emit(MovCond(lhs, Immediate(1), Cond.EQ))
+      gr.emit(MovCond(lhs, Immediate(0), Cond.NE))
+    } else {
+      gr.emit(Mov(lhs, RETURN_REG))
+    }
   }
 
   // Emit arithmetic instruction and check for overflow 

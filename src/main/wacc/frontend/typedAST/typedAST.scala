@@ -10,7 +10,19 @@ object TypedExpr {
   /* Binary arithmetic operations: +, -, *, /, % */
   enum ArithmeticOperation extends BinaryOperation {case Add, Sub, Mul, Div, Mod}
   case class BinaryArithmetic(left: TypedExpr, right: TypedExpr, op: ArithmeticOperation)
-    extends TypedExpr(SemInt)
+    extends TypedExpr(
+      op match {
+        case ArithmeticOperation.Mod =>
+          SemInt
+
+        case _ =>
+          (left.ty, right.ty) match {
+            case (SemInt, SemInt)       => SemInt
+            case (SemFloat, SemFloat)   => SemFloat
+            case _                      => SemUnknown
+          }
+      }
+    )
 
   /* Binary comparison operations: ==, !=, >, >=, <, <= */
   enum CompareOperation extends BinaryOperation {case Greater, GreaterEqual, Less, LessEqual, Equal, NotEqual}
@@ -29,7 +41,13 @@ object TypedExpr {
 
   /* Unary operations: !, -, len, ord, chr, ~ */
   case class Not(operand: TypedExpr) extends TypedExpr(SemBool)
-  case class Neg(operand: TypedExpr) extends TypedExpr(SemInt)
+  case class Neg(operand: TypedExpr) extends TypedExpr(
+    operand.ty match {
+      case SemInt   => SemInt
+      case SemFloat => SemFloat
+      case _        => SemUnknown
+    }
+  )
   case class Len(operand: TypedExpr) extends TypedExpr(SemInt)
   case class Ord(operand: TypedExpr) extends TypedExpr(SemInt)
   case class Chr(operand: TypedExpr) extends TypedExpr(SemChar)

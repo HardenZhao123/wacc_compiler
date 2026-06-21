@@ -4,7 +4,7 @@ import wacc.backend.BackendCommon.Immediate
 import preDefHelpersConstant.*
 import wacc.backend.AArch64.codeGen.A64Instr
 import wacc.backend.AArch64.codeGen.A64Instr.*
-import wacc.backend.AArch64.target.{A64Reg, Reg}
+import wacc.backend.AArch64.target.{A64Reg, D, Reg, S}
 import wacc.backend.AArch64.AArch64Constants.*
 import wacc.backend.BackendCommon.Cond
 import wacc.backend.BackendCommon.*
@@ -121,6 +121,17 @@ object PreDefHelpers {
     List(StringData(Label(LBL_PRINTC_STR0), FMT_CHAR_C, true), Label(_PRINTC)) ++
       withLR(printfW0WithFmt(Label(LBL_PRINTC_STR0)))
 
+  // _printfl: promote the float bits in w0 to a double in d0 for printf("%g", ...).
+  val printFloat: List[A64Instr] =
+    List(StringData(Label(LBL_PRINTFL_STR0), FMT_FLOAT_G, true), Label(_PRINTFL)) ++
+      withLR(
+        List(
+          FMov(S(0), RETURN_REG_32),
+          FCvt(D(0), S(0)),
+          Adr(RETURN_REG_64, Label(LBL_PRINTFL_STR0))
+        ) ++ afterPrintf
+      )
+
   // _printp: printf("%p", x0)  => x0=format, x1=value
   val printPointer: List[A64Instr] =
     List(StringData(Label(LBL_PRINTP_STR0), FMT_PTR_P, true), Label(_PRINTP)) ++
@@ -191,6 +202,13 @@ object PreDefHelpers {
       postLoad = List(And(RETURN_REG_32, RETURN_REG_32, Immediate(0xFF)))
     )
 
+  // _readfl: scanf("%f", &tmp); return the raw single-precision bits in w0.
+  val readFloat: List[A64Instr] =
+    List(
+      StringData(Label(LBL_READFL_STR0), FMT_FLOAT_F, true),
+      Label(_READFL)
+    ) ++ readWithScanf(READ_PREFIX_FLOAT, Label(LBL_READFL_STR0))
+
   // Predefined helper that wraps `malloc` and branches to the OOM trap on failure.
   val malloc: List[A64Instr] =
     List(Label(_MALLOC)) ++
@@ -257,10 +275,12 @@ object PreDefHelpers {
     _PRINTC -> printChar,
     _PRINTP -> printPointer,
     _PRINTB -> printBool,
+    _PRINTFL -> printFloat,
     _PRINTS -> printString,
     _PRINTLN -> printLn,
     _READI -> readInt,
     _READC -> readChar,
+    _READFL -> readFloat,
     _FREEARR -> freeArr,
     _FREEPAIR -> freePair,
     _MALLOC -> malloc,
@@ -269,8 +289,8 @@ object PreDefHelpers {
 
   // Stable order for deterministic output
   private val stableOrder: List[String] = List(
-    _PRINTI, _PRINTC, _PRINTP, _PRINTS, _PRINTB, _PRINTLN,
-    _READI, _READC, _FREEARR, _FREEPAIR, _MALLOC, _ERR_UNHANDLED
+    _PRINTI, _PRINTC, _PRINTP, _PRINTS, _PRINTB, _PRINTFL, _PRINTLN,
+    _READI, _READC, _READFL, _FREEARR, _FREEPAIR, _MALLOC, _ERR_UNHANDLED
   )
 
   /** Emit only the requested predefined helpers */

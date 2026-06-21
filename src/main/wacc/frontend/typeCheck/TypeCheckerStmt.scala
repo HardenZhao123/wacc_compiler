@@ -101,13 +101,13 @@ object TypeCheckerStmt {
     // Read statement
     case Read(lhs) =>
 
-      // l-value must have type int or char
+      // l-value must have a scalar type supported by the runtime input helpers
       val (rawTyOpt, lhsTypedLValue) = TypeCheckerLR.checkLValue(lhs, Constraint.UnConstraint)
       rawTyOpt match {
-        case Some(SemInt) | Some(SemChar) => ()
+        case Some(SemInt) | Some(SemChar) | Some(SemFloat) => ()
         case Some(SemUnknown) => ctx.addError(CannotInferType(stmt.positionInfo))
         case Some(otherTy) =>
-          ctx.addError(TypeMismatch("int or char", SemanticType.show(otherTy), stmt.positionInfo))
+          ctx.addError(TypeMismatch("int, char or float", SemanticType.show(otherTy), stmt.positionInfo))
         case None =>
           ctx.addError(CannotInferType(stmt.positionInfo))
       }

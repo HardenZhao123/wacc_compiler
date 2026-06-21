@@ -89,6 +89,22 @@ object PreDefHelpers {
   // pre-defined function to print character
   private val printC: List[A32Instr] = printHelper(LBL_PRINTC_STR0, FMT_CHAR_C, _PRINTC)
 
+  // pre-defined function to print float
+  private val printFL: List[A32Instr] =
+    List(
+      StringData(Label(LBL_PRINTFL_STR0), FMT_FLOAT_G, true),
+      Label(_PRINTFL)
+    ) ++ withFrame(
+      List(
+        Bl(Label(LIBC_FLOAT_TO_DOUBLE)),
+
+        Mov(R2_REG, RETURN_REG),
+        Mov(R3_REG, R1_REG),
+
+        Adr(RETURN_REG, Label(LBL_PRINTFL_STR0))
+      ) ++ afterPrintf
+    )
+
   // pre-defined function to print pointer
   private val printP: List[A32Instr] = printHelper(LBL_PRINTP_STR0, FMT_PTR_P, _PRINTP)
 
@@ -152,6 +168,17 @@ object PreDefHelpers {
       Ldrb(RETURN_REG, MemAddress.ImmOffsetAddress(SP, 0, NoIndex))
     )
 
+  // pre-defined function to read a single-precision float
+  private val readFL: List[A32Instr] =
+    List(
+      StringData(Label(LBL_READFL_STR0), FMT_FLOAT_F, true),
+      Label(_READFL)
+    ) ++ readWithScanf(
+      Label(LBL_READFL_STR0),
+      Str(RETURN_REG, MemAddress.ImmOffsetAddress(SP, 0, NoIndex)),
+      Ldr(RETURN_REG, MemAddress.ImmOffsetAddress(SP, 0, NoIndex))
+    )
+
   // pre-defined function to malloc array or pair
   private val malloc: List[A32Instr] =
     List(Label(_MALLOC)) ++ withFrame(
@@ -202,11 +229,13 @@ object PreDefHelpers {
     _PRINTI -> printI,
     _PRINTB -> printB,
     _PRINTC -> printC,
+    _PRINTFL -> printFL,
     _PRINTS -> printS,
     _PRINTP -> printP,
     _PRINTLN -> printLn,
     _READI -> readI,
     _READC -> readC,
+    _READFL -> readFL,
     _MALLOC -> malloc,
     _FREE -> free,
     _FREEPAIR -> freePair,
@@ -216,8 +245,8 @@ object PreDefHelpers {
   // Stable order for deterministic output
   private val stableOrder: List[String] = List(
     _EXIT, _PRINTI, _PRINTB, _PRINTC, _PRINTS, _PRINTP,
-    _PRINTLN, _READI, _READC, _MALLOC, _FREE, _FREEPAIR,
-    _ERR_UNHANDLED
+    _PRINTLN, _READI, _READC, _READFL, _MALLOC, _FREE, _FREEPAIR,
+    _ERR_UNHANDLED, _PRINTFL
   )
 
   /** Emit only the requested predefined helpers */

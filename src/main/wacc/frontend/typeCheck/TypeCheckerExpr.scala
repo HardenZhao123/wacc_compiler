@@ -20,20 +20,20 @@ object TypeCheckerExpr {
       // Operators delegate to small helpers so inference/error behaviour stays uniform across the AST.
       // Unary: !, -, len, ord, chr and ~
       case Not(operand) => checkUnaryOp(operand, SemBool, c, pos)(e => TypedExpr.Not(e))
-      case Neg(operand) => checkUnaryOp(operand, SemInt, c, pos)(e => TypedExpr.Neg(e))
+      case Neg(operand) => checkNumericUnaryOp(operand, c, pos)(e => TypedExpr.Neg(e))
       case Len(operand) => checkUnaryOp(operand, SemArray(SemUnknown, anyDimension), c, pos)(e => TypedExpr.Len(e))
       case Ord(operand) => checkUnaryOp(operand, SemChar, c, pos)(e => TypedExpr.Ord(e))
       case Chr(operand) => checkUnaryOp(operand, SemInt, c, pos)(e => TypedExpr.Chr(e))
       case BitNot(operand) => checkUnaryOp(operand, SemInt, c, pos)(e => TypedExpr.BitNot(e))
 
-      // Arithmetic (fixed operand type = int)
-      case Add(left, right) => checkBinaryOpFixed(left, right, SemInt, c, pos)((l, r) =>
+      // Arithmetic
+      case Add(left, right) => checkNumericBinaryOp(left, right, c, pos)((l, r) =>
         TypedExpr.BinaryArithmetic(l, r, TypedExpr.ArithmeticOperation.Add))
-      case Sub(left, right) => checkBinaryOpFixed(left, right, SemInt, c, pos)((l, r) =>
+      case Sub(left, right) => checkNumericBinaryOp(left, right, c, pos)((l, r) =>
         TypedExpr.BinaryArithmetic(l, r, TypedExpr.ArithmeticOperation.Sub))
-      case Mul(left, right) => checkBinaryOpFixed(left, right, SemInt, c, pos)((l, r) =>
+      case Mul(left, right) => checkNumericBinaryOp(left, right, c, pos)((l, r) =>
         TypedExpr.BinaryArithmetic(l, r, TypedExpr.ArithmeticOperation.Mul))
-      case Div(left, right) => checkBinaryOpFixed(left, right, SemInt, c, pos)((l, r) =>
+      case Div(left, right) => checkNumericBinaryOp(left, right, c, pos)((l, r) =>
         TypedExpr.BinaryArithmetic(l, r, TypedExpr.ArithmeticOperation.Div))
       case Mod(left, right) => checkBinaryOpFixed(left, right, SemInt, c, pos)((l, r) =>
         TypedExpr.BinaryArithmetic(l, r, TypedExpr.ArithmeticOperation.Mod))
@@ -50,14 +50,14 @@ object TypeCheckerExpr {
       case NotEqual(left, right) => checkEquality(left, right, c, pos)((l, r) =>
         TypedExpr.BinaryCompare(l, r, TypedExpr.CompareOperation.NotEqual))
 
-      // Comparisons (int/char, needs coordination)
-      case Greater(left, right) => checkIntChar(left, right, c, pos)((l, r) =>
+      // Ordered comparisons (int/char/float, needs coordination)
+      case Greater(left, right) => checkOrdered(left, right, c, pos)((l, r) =>
         TypedExpr.BinaryCompare(l, r, TypedExpr.CompareOperation.Greater))
-      case GreaterEqual(left, right) => checkIntChar(left, right, c, pos)((l, r) =>
+      case GreaterEqual(left, right) => checkOrdered(left, right, c, pos)((l, r) =>
         TypedExpr.BinaryCompare(l, r, TypedExpr.CompareOperation.GreaterEqual))
-      case Less(left, right) => checkIntChar(left, right, c, pos)((l, r) =>
+      case Less(left, right) => checkOrdered(left, right, c, pos)((l, r) =>
         TypedExpr.BinaryCompare(l, r, TypedExpr.CompareOperation.Less))
-      case LessEqual(left, right) => checkIntChar(left, right, c, pos)((l, r) =>
+      case LessEqual(left, right) => checkOrdered(left, right, c, pos)((l, r) =>
         TypedExpr.BinaryCompare(l, r, TypedExpr.CompareOperation.LessEqual))
 
       // Bitwise operations (& and |, needs int)
@@ -102,25 +102,59 @@ object TypeCheckerExpr {
     (finalTyOpt, finalTypedExpr)
   }
 
-  /* Check comparison operators that allow either int or char operands. */
-  private def checkIntChar(left: Expr, right: Expr, parentConstraint: Constraint, pos: PositionInfo)
-                          (makeTyped: (TypedExpr, TypedExpr) => TypedExpr)
-                          (using ctx: TypeChecker.TypeCheckerCtx): (Option[SemanticType], TypedExpr) = {
-    val (leftTyOpt, leftTypedExpr) = checkExpr(left, Constraint.Either(SemInt, SemChar))
+  private def checkNumericBinaryOp(left: Expr, right: Expr, parentConstraint: Constraint, pos: PositionInfo)
+                                  (makeTyped: (TypedExpr, TypedExpr) => TypedExpr)
+                                  (using cts: TypeChecker.TypeCheckerCtx): (Option[SemanticType], TypedExpr) = {
+    val (leftTyOpt, leftTypedExpr) = checkExpr(left, Constraint.Either(SemInt, SemFloat))
 
-    // Let the left operand narrow the right operand when possible, but keep the union if the left stays unknown.
     val rightConstraint = leftTyOpt match {
-      case Some(t) if t != SemUnknown => Constraint.Is(t)
-      case _                          => Constraint.Either(SemInt, SemChar)
+      case Some(t) if t == SemInt || t == SemFloat    => Constraint.Is(t)
+      case _                                          => Constraint.Either(SemInt, SemFloat)
     }
 
     val (_, rightTypedExpr) = checkExpr(right, rightConstraint)
     val finalTypedExpr = makeTyped(leftTypedExpr, rightTypedExpr)
+    unifyTypes(leftTypedExpr, rightTypedExpr)(using cts, pos)
+    val finalTyOpt = finalTypedExpr.ty.satisfies(parentConstraint)(using cts, pos)
 
-    // If one side was unknown, try to align; if both unknown, this will report CannotInferType at the operator position.
+    (finalTyOpt, finalTypedExpr)
+  }
+
+  /* Check comparison operators that allow int, float or char operands. */
+  private def checkOrdered(left: Expr, right: Expr, parentConstraint: Constraint, pos: PositionInfo)
+                          (makeTyped: (TypedExpr, TypedExpr) => TypedExpr)
+                          (using ctx: TypeChecker.TypeCheckerCtx): (Option[SemanticType], TypedExpr) = {
+
+    val (leftTyOpt, leftTypedExpr) = checkExpr(left, Constraint.UnConstraint)
+
+    val rightConstraint = leftTyOpt match {
+      case Some(SemInt)   => Constraint.Is(SemInt)
+      case Some(SemChar)  => Constraint.Is(SemChar)
+      case Some(SemFloat) => Constraint.Is(SemFloat)
+      case _              => Constraint.UnConstraint
+    }
+
+    val (_, rightTypedExpr) = checkExpr(right, rightConstraint)
+
+    val leftTy = leftTypedExpr.ty
+    val rightTy = rightTypedExpr.ty
+
+    def isOrderedType(t: SemanticType): Boolean =
+      t == SemInt || t == SemChar || t == SemFloat || t == SemUnknown
+
+    if (!isOrderedType(leftTy)) {
+      ctx.addError(TypeMismatch("int, char or float", SemanticType.show(leftTy), pos))
+    }
+
+    if (!isOrderedType(rightTy)) {
+      ctx.addError(TypeMismatch("int, char or float", SemanticType.show(rightTy), pos))
+    }
+
     unifyTypes(leftTypedExpr, rightTypedExpr)(using ctx, pos)
 
+    val finalTypedExpr = makeTyped(leftTypedExpr, rightTypedExpr)
     val finalTyOpt = finalTypedExpr.ty.satisfies(parentConstraint)(using ctx, pos)
+
     (finalTyOpt, finalTypedExpr)
   }
 
@@ -131,6 +165,16 @@ object TypeCheckerExpr {
     val (_, typedExpr) = checkExpr(expr, Constraint.Is(expected))
     val finalTypedExpr = makeTyped(typedExpr)
     val finalTyOpt = finalTypedExpr.ty.satisfies(parentConstraint)(using ctx, pos)
+    (finalTyOpt, finalTypedExpr)
+  }
+
+  private def checkNumericUnaryOp(expr: Expr, parentConstraint: Constraint, pos: PositionInfo)
+                                 (makeTyped: TypedExpr => TypedExpr)
+                                 (using ctx: TypeChecker.TypeCheckerCtx): (Option[SemanticType], TypedExpr) = {
+    val (_, typedExpr) = checkExpr(expr, Constraint.Either(SemInt, SemFloat))
+    val finalTypedExpr = makeTyped(typedExpr)
+    val finalTyOpt = finalTypedExpr.ty.satisfies(parentConstraint)(using ctx, pos)
+
     (finalTyOpt, finalTypedExpr)
   }
 

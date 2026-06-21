@@ -71,6 +71,18 @@ final class A32StackFrame(stackSlots: Seq[Temp]) extends CommonStackFrame {
       if (math.abs(v) < MAX_INT_ARM32) then gr.emit(Mov(into, Immediate(v)))
       else gr.emit(LdrFuncPtr(into, MemAddress.LabelAddress(Label(s"=${v.toString}"))))
 
+    case FloatValue(v, _) =>
+      val bits: Long = java.lang.Float.floatToRawIntBits(v) & 0xffffffffL
+
+      if (bits < MAX_INT_ARM32) {
+        gr.emit(Mov(into, Immediate(bits)))
+      } else {
+        gr.emit(LdrFuncPtr(
+          into,
+          MemAddress.LabelAddress(Label(f"=0x$bits%08x"))
+        ))
+      }
+
     // Strings in TAC
     case TACStr(id, _) =>
       val label = Label(s"=.str_$id")

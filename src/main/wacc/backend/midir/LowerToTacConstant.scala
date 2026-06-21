@@ -7,6 +7,8 @@ object LowerToTacConstant {
   val IF_LABEL_END  = "if_end"
   val WHILE_LABEL_HEAD = "while_head"
   val WHILE_LABEL_END  = "while_end"
+  val DO_WHILE_COND = "do_while_cond"
+  val FOR_UPDATE = "for_update"
   val SC_LABEL_SUFFIX_BRANCH = "_branch"
   val SC_LABEL_SUFFIX_END    = "_end"
   val ERR_UNDEFINED_VAR_PREFIX = "Undefined variable: "

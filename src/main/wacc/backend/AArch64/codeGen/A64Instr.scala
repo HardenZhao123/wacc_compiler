@@ -48,6 +48,25 @@ object A64Instr {
     val opcode = "sdiv"
   }
 
+  sealed trait FloatArithmeticInstr extends AsmInstr {
+    val dest: S
+    val op1: S
+    val op2: S
+    override def operands = Seq(dest, op1, op2)
+  }
+  case class FAdd(dest: S, op1: S, op2: S) extends FloatArithmeticInstr {
+    val opcode = "fadd"
+  }
+  case class FSub(dest: S, op1: S, op2: S) extends FloatArithmeticInstr {
+    val opcode = "fsub"
+  }
+  case class FMul(dest: S, op1: S, op2: S) extends FloatArithmeticInstr {
+    val opcode = "fmul"
+  }
+  case class FDiv(dest: S, op1: S, op2: S) extends FloatArithmeticInstr {
+    val opcode = "fdiv"
+  }
+
   case class MSub(dest: A64Reg, op1: A64Reg, op2: A64Reg, op3: A64Reg) extends AsmInstr {
     val opcode = "msub"
     override def operands = Seq(dest, op1, op2, op3)
@@ -94,6 +113,14 @@ object A64Instr {
   case class Movk(dest: A64Reg, src: A64Operand, shift: ShiftType) extends AsmInstr {
     val opcode = "movk"
     override def operands = Seq(dest, src, shift)
+  }
+  case class FMov(dest: Register, src: Register) extends AsmInstr {
+    val opcode = "fmov"
+    override def operands = Seq(dest, src)
+  }
+  case class FCvt(dest: D, src: S) extends AsmInstr {
+    val opcode = "fcvt"
+    override def operands = Seq(dest, src)
   }
 
   // Branch instructions
@@ -176,6 +203,10 @@ object A64Instr {
     override def operands: Seq[Any] =
       if (isMull) Seq(lhs, rhs, "sxtw")
       else Seq(lhs, rhs)
+  }
+  case class FCmp(lhs: S, rhs: S) extends AsmInstr {
+    val opcode = "fcmp"
+    override def operands = Seq(lhs, rhs)
   }
 
   // Pair load/store & return (needed for stack frames)
