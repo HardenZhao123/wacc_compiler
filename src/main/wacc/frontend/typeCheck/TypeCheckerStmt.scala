@@ -150,8 +150,15 @@ object TypeCheckerStmt {
       val (_, typedExpr) = TypeCheckerExpr.checkExpr(expr, Constraint.UnConstraint)
       Some(TypedStmt.Println(typedExpr))
 
-    // If statement
-    case If(cond, thn, els) =>
+    // If statement  
+    case If(cond, thn) => 
+      val (_, condTypedExpr) = TypeCheckerExpr.checkExpr(cond, Constraint.Is(SemBool))
+      val thenTypedStmts = checkStmtHelper(thn)
+      
+      Some(TypedStmt.If(condTypedExpr, thenTypedStmts))
+
+    // If-Else statement
+    case IfElse(cond, thn, els) =>
       val (_, condTypedExpr) = TypeCheckerExpr.checkExpr(cond, Constraint.Is(SemBool))
 
       // Branches are checked independently so declarations in one arm do not leak into the other.
@@ -161,7 +168,7 @@ object TypeCheckerStmt {
       // Check `else` body
       val elseTypedStmts = checkStmtHelper(els)
 
-      Some(TypedStmt.If(condTypedExpr, thenTypedStmts, elseTypedStmts))
+      Some(TypedStmt.IfElse(condTypedExpr, thenTypedStmts, elseTypedStmts))
 
     // While loop
     case While(cond, body) =>

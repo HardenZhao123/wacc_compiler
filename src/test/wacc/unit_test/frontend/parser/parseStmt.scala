@@ -284,14 +284,14 @@ class StmtParserTest extends AnyFlatSpec with ParserTestHelpers {
 
   it should "parse if else statement" in {
     p.parseStmt("if x == 1 then return true else return false fi") match {
-      case Success(If(Equal(Identifier("x"), IntLiter(1)), Return(BooleanLiter(true)), Return(BooleanLiter(false)))) => succeed
+      case Success(IfElse(Equal(Identifier("x"), IntLiter(1)), Return(BooleanLiter(true)), Return(BooleanLiter(false)))) => succeed
       case Success(other) => fail(s"Unexpected parse result: $other")
       case Failure(err) => fail(s"Parsing failed: $err")
     }
 
     p.parseStmt("if len arr == 10 then arr = call f(); print 1 else arr = newpair(1, false) fi") match {
       case Success(
-      If(
+      IfElse(
       Equal(Len(Identifier("arr")), IntLiter(10)),
       SeqStmt(
       List(
@@ -305,8 +305,6 @@ class StmtParserTest extends AnyFlatSpec with ParserTestHelpers {
       case Success(other) => fail(s"Unexpected parse result: $other")
       case Failure(err)   => fail(s"Parsing failed: $err")
     }
-
-    expectFailure(p.parseStmt("if true then a = 1 fi"))
   }
 
   it should "parse while statement" in {

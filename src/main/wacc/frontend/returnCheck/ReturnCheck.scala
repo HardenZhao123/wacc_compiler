@@ -12,7 +12,7 @@ object ReturnCheck {
     case Throw(_) => true
     case Exit(_) => true
 
-    case If(_, thn, els) =>
+    case IfElse(_, thn, els) =>
       // Both branches must terminate to guarantee the if-statement as a whole returns.
       isReturning(thn) && isReturning(els)
 

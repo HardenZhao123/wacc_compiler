@@ -255,7 +255,9 @@ object parser {
 
     private lazy val continueP: Parsley[Stmt] = Continue from "Continue"
 
-    private lazy val ifP: Parsley[Stmt] = If("if" ~> expr, "then" ~> stmtP, "else" ~> stmtP <~ "fi")
+    private lazy val ifElseP: Parsley[Stmt] = IfElse("if" ~> expr, "then" ~> stmtP, "else" ~> stmtP <~ "fi")
+
+    private lazy val ifP: Parsley[Stmt] = If("if" ~> expr, "then" ~> stmtP <~ "fi")
 
     private lazy val readP: Parsley[Stmt] = Read("read" ~> lvalueP)
 
@@ -269,7 +271,7 @@ object parser {
 
     // Statement atoms: preference order is important because many productions share prefixes.
     private lazy val stmtAtom: Parsley[Stmt] =
-        skipP <|> ifP <|> whileP <|> forP <|> beginP <|> tryCatchP
+        skipP <|> atomic(ifElseP) <|> ifP <|> whileP <|> forP <|> beginP <|> tryCatchP
       <|> doWhileP <|> breakP <|> continueP <|> declP <|> assignP <|> readP <|> freeP
       <|> returnP <|> throwP <|> exitP <|> printP <|> printlnP
 
