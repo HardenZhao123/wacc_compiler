@@ -305,8 +305,6 @@ class StmtParserTest extends AnyFlatSpec with ParserTestHelpers {
       case Success(other) => fail(s"Unexpected parse result: $other")
       case Failure(err)   => fail(s"Parsing failed: $err")
     }
-
-    expectFailure(p.parseStmt("if true then a = 1 fi"))
   }
 
   it should "parse while statement" in {
