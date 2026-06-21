@@ -561,6 +561,18 @@ class TypeCheckerTest extends AnyFlatSpec {
       """
     shouldExit(src, ExitCode.Success)
   }
+
+  it should "reject a non-boolean for-loop condition" in {
+    val src =
+      """
+      begin
+        for (int x = 1, x + 1, x = x + 1)
+          skip
+        done
+      end
+      """
+    shouldExit(src, ExitCode.SemanticError)
+  }
   
   it should "accept a basic do-while loop" in {
     val src =
@@ -717,4 +729,3 @@ class TypeCheckerTest extends AnyFlatSpec {
     shouldExit(src, ExitCode.SemanticError)
   }
 }
-

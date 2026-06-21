@@ -196,15 +196,21 @@ object TypeCheckerStmt {
       Some(TypedStmt.TryCatch(tryTypedStmts, typedHandlers))
 
     case For(init, cond, update, body) =>
-      // The three statement positions share loop depth accounting, but they are still checked in source order.
-      val (_, condTypedExpr) = TypeCheckerExpr.checkExpr(cond, Constraint.Is(SemBool))
-
-      val (initTypedStmts, updateTypedStmts, bodyTypedStmts) = withLoopDepth {
-        val initTyped = checkStmtHelper(init)
-        val updateTyped = checkStmtHelper(update)
-        val bodyTyped = checkStmtHelper(body)
-        (initTyped, updateTyped, bodyTyped)
-      }
+      // The initializer introduces bindings that are visible to the condition,
+      // update and body, but the entire loop scope must not escape afterwards.
+      val oldEnv = ctx.env
+      val (initTypedStmts, condTypedExpr, updateTypedStmts, bodyTypedStmts) =
+        try {
+          withLoopDepth {
+            val initTyped = checkStmtHelper(init)
+            val (_, condTyped) = TypeCheckerExpr.checkExpr(cond, Constraint.Is(SemBool))
+            val updateTyped = checkStmtHelper(update)
+            val bodyTyped = checkStmtHelper(body)
+            (initTyped, condTyped, updateTyped, bodyTyped)
+          }
+        } finally {
+          ctx.env = oldEnv
+        }
 
       Some(TypedStmt.For(initTypedStmts, condTypedExpr, updateTypedStmts, bodyTypedStmts))
 
