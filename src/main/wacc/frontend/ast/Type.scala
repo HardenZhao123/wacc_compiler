@@ -12,6 +12,7 @@ case class IntType()(override val positionInfo: PositionInfo) extends Type
 case class BoolType()(override val positionInfo: PositionInfo) extends Type
 case class CharType()(override val positionInfo: PositionInfo) extends Type
 case class StringType()(override val positionInfo: PositionInfo) extends Type
+case class FloatType()(override val positionInfo: PositionInfo) extends Type 
 
 // Array type with element type and number of dimensions
 case class ArrayType(elem: Type, dimensions: Int)(override val positionInfo: PositionInfo) extends Type {

@@ -10,6 +10,7 @@ object SemanticType {
   case object SemInt extends SemanticType
   case object SemBool extends SemanticType
   case object SemChar extends SemanticType
+  case object SemFloat extends SemanticType
   case object SemString extends SemanticType
 
   // Array type τ[]
@@ -50,7 +51,7 @@ object SemanticType {
 
   /* Checks if a semantic type is fully known (not unknown) */
   def isKnown(t: SemanticType): Boolean = t match {
-    case SemInt | SemBool | SemChar | SemString => true
+    case SemInt | SemBool | SemChar | SemFloat | SemString => true
     case SemArray(_, _) => true
     case SemPair(_, _) => true
     case SemException => true
@@ -72,6 +73,7 @@ object SemanticType {
     case _: IntType => SemInt
     case _: BoolType => SemBool
     case _: CharType => SemChar
+    case _: FloatType => SemFloat
     case _: StringType => SemString
     case ArrayType(elem, dims) => SemArray(fromAstType(elem), dims)
     case PairType(fst, snd) => SemPair(fromAstType(fst), fromAstType(snd))
@@ -84,6 +86,7 @@ object SemanticType {
     case SemInt => "int"
     case SemBool => "bool"
     case SemChar => "char"
+    case SemFloat => "float"
     case SemString => "string"
     case SemArray(e, n) => 
       if n > 0 then show(e) + "[]".repeat(n)

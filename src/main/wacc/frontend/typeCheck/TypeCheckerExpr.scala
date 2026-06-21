@@ -70,6 +70,7 @@ object TypeCheckerExpr {
       case IntLiter(v) => (SemInt.satisfies(c)(using ctx, pos), TypedExpr.IntLit(v))
       case BooleanLiter(v) => (SemBool.satisfies(c)(using ctx, pos), TypedExpr.BoolLit(v))
       case CharLiter(v) => (SemChar.satisfies(c)(using ctx, pos), TypedExpr.CharLit(v))
+      case FloatLiter(v) => (SemFloat.satisfies(c)(using ctx, pos), TypedExpr.FloatLit(v))
       case StringLiter(v) => (SemString.satisfies(c)(using ctx, pos), TypedExpr.StrLit(v))
       case PairLiter() => (SemPairErased.satisfies(c)(using ctx, pos), TypedExpr.PairLit())
 

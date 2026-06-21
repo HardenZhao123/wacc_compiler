@@ -34,4 +34,3 @@ object RenameError {
     val msg = s"function out-of-scope: $name"
   }
 }
-

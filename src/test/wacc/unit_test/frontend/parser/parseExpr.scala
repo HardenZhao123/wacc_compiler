@@ -38,6 +38,24 @@ class ExprParserTest extends AnyFlatSpec with ParserTestHelpers {
     }
   }
 
+  it should "parse a simple float" in {
+    val r = p.parseExpr("   3.14  ")
+    r match {
+      case Success(FloatLiter(v)) => v shouldBe 3.14f
+      case Success(other) => fail(s"Unexpected parse result: $other")
+      case Failure(err) => fail(s"Parsing failed: $err")
+    }
+  }
+
+  it should "parse addition and multiplication with precedence in floating-point system" in {
+    val r = p.parseExpr("1.23 + 2 * 3")
+    r match {
+      case Success(Add(FloatLiter(1.23), Mul(IntLiter(2), IntLiter(3)))) => succeed
+      case Success(other) => fail(s"Unexpected parse result: $other")
+      case Failure(err) => fail(s"Parsing failed: $err")
+    }
+  }
+
   it should "parse pair-liter" in {
     val r = p.parseExpr("  null")
     r match {

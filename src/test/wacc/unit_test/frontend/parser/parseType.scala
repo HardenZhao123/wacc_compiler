@@ -28,6 +28,15 @@ class BaseTypeParserTest extends AnyFlatSpec with ParserTestHelpers {
     }
   }
 
+  it should "parse float" in {
+    val r = p.parseBaseType("float")
+    r match {
+      case Success(FloatType()) => succeed
+      case Success(other) => fail(s"Unexpected parse result: $other")
+      case Failure(err) => fail(s"Parsing failed: $err")
+    }
+  }
+
   it should "parse char" in {
     val r = p.parseBaseType("  char ")
     r match {

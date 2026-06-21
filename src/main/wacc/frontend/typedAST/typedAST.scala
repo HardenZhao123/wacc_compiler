@@ -39,6 +39,7 @@ object TypedExpr {
   case class IntLit(value: Int) extends TypedExpr(SemInt)
   case class BoolLit(value: Boolean) extends TypedExpr(SemBool)
   case class CharLit(value: Char) extends TypedExpr(SemChar)
+  case class FloatLit(value: Float) extends TypedExpr(SemFloat)
   case class StrLit(value: String) extends TypedExpr(SemString)
   case class PairLit() extends TypedExpr(SemPairErased)
 }
@@ -107,5 +108,3 @@ object TypedStmt {
 /* Typed Function and Program */
 case class TypedFunction(returnType: SemanticType, ident: String, resolvedIdent: String, params: List[TypedLValue.Id], stmts: List[TypedStmt])
 case class TypedProgram(funcs: List[TypedFunction], stmts: List[TypedStmt])
-
-

@@ -247,5 +247,3 @@ object TypeCheckerLR {
     (exactMatches, -weakMatches)
   }
 }
-
-

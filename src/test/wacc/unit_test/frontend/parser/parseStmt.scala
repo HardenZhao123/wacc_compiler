@@ -77,11 +77,17 @@ class LValueParserTest extends AnyFlatSpec with ParserTestHelpers {
 class RValueParserTest extends AnyFlatSpec with ParserTestHelpers {
   private val p = parser
 
-  "rvalue parser" should "parse expr rvalues such as 1 + 2 and len a" in {
+  "rvalue parser" should "parse expr rvalues such as 1 + 2, 1.23 + 3 and len a" in {
     p.parseRValue("1 + 2") match {
       case Success(RExpr(Add(IntLiter(1), IntLiter(2)))) => succeed
       case Success(other)                                => fail(s"Unexpected parse result: $other")
       case Failure(err)                                  => fail(s"Parsing failed: $err")
+    }
+
+    p.parseRValue("1.23 + 3") match {
+      case Success(RExpr(Add(FloatLiter(1.23), IntLiter(3)))) => succeed
+      case Success(other)                                     => fail(s"Unexpected parse result: $other")
+      case Failure(err)                                       => fail(s"Parsing failed: $err")
     }
 
     p.parseRValue("len x") match {

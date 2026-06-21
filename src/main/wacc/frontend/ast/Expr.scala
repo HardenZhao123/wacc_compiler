@@ -15,6 +15,7 @@ object Expr {
   case class IntLiter(value: Int)(override val positionInfo: PositionInfo) extends Atom
   case class BooleanLiter(bool: Boolean)(override val positionInfo: PositionInfo) extends Atom
   case class CharLiter(char: Char)(override val positionInfo: PositionInfo) extends Atom
+  case class FloatLiter(value: Float)(override val positionInfo: PositionInfo) extends Atom
   case class StringLiter(string: String)(override val positionInfo: PositionInfo) extends Atom
   case class PairLiter()(override val positionInfo: PositionInfo) extends Atom
   case class Identifier(ident: String)(override val positionInfo: PositionInfo) extends Atom
@@ -25,6 +26,7 @@ object Expr {
   object IntLiter extends ParserBridgePos1[Int, IntLiter]
   object BooleanLiter extends ParserBridgePos1[Boolean, BooleanLiter]
   object CharLiter extends ParserBridgePos1[Char, CharLiter]
+  object FloatLiter extends ParserBridgePos1[Float, FloatLiter]
   object StringLiter extends ParserBridgePos1[String, StringLiter]
   object Identifier extends ParserBridgePos1[String, Identifier]
   object ArrayElem extends ParserBridgePos2[Identifier, List[Expr], ArrayElem]
