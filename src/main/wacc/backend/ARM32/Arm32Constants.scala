@@ -84,6 +84,8 @@ object Arm32Constants {
 
   val AEABI_FDIV = "__aeabi_fdiv"
 
+  val AEABI_I2F = "__aeabi_i2f"
+
   val AEABI_FCMPEQ = "__aeabi_fcmpeq"
 
   val AEABI_FCMPLT = "__aeabi_fcmplt"

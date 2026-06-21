@@ -19,6 +19,8 @@ object TypedExpr {
           (left.ty, right.ty) match {
             case (SemInt, SemInt)       => SemInt
             case (SemFloat, SemFloat)   => SemFloat
+            case (SemFloat, SemInt)     => SemFloat
+            case (SemInt, SemFloat)     => SemFloat
             case _                      => SemUnknown
           }
       }

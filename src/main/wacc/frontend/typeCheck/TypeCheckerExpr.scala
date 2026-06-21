@@ -105,14 +105,10 @@ object TypeCheckerExpr {
   private def checkNumericBinaryOp(left: Expr, right: Expr, parentConstraint: Constraint, pos: PositionInfo)
                                   (makeTyped: (TypedExpr, TypedExpr) => TypedExpr)
                                   (using cts: TypeChecker.TypeCheckerCtx): (Option[SemanticType], TypedExpr) = {
-    val (leftTyOpt, leftTypedExpr) = checkExpr(left, Constraint.Either(SemInt, SemFloat))
-
-    val rightConstraint = leftTyOpt match {
-      case Some(t) if t == SemInt || t == SemFloat    => Constraint.Is(t)
-      case _                                          => Constraint.Either(SemInt, SemFloat)
-    }
-
+    val (_, leftTypedExpr) = checkExpr(left, Constraint.Either(SemInt, SemFloat))
+    val rightConstraint = Constraint.Either(SemInt, SemFloat)
     val (_, rightTypedExpr) = checkExpr(right, rightConstraint)
+
     val finalTypedExpr = makeTyped(leftTypedExpr, rightTypedExpr)
     unifyTypes(leftTypedExpr, rightTypedExpr)(using cts, pos)
     val finalTyOpt = finalTypedExpr.ty.satisfies(parentConstraint)(using cts, pos)

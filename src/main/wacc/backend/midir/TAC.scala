@@ -33,6 +33,7 @@ object TAC {
   // dst = (op) x
   final case class UnOp(dst: Temp, op: UnaryOp, x: Rhs) extends Instr
   final case class CheckedUnOp(dst: Temp, op: UnaryOp, x: Rhs, onOverflow: Label) extends Instr
+  final case class IntToFloat(dst: Temp, value: Rhs) extends Instr
 
   // Exception state operations
   final case class TACStoreException(value: Rhs) extends Instr

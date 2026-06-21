@@ -119,14 +119,17 @@ class TypeCheckerTest extends AnyFlatSpec {
     shouldExit(src, ExitCode.Success)
   }
 
-  it should "reject mixed int and float arithmetic" in {
+  it should "accept mixed int and float arithmetic with a float result" in {
     val src =
       """
       begin
-        float x = 1.5 + 1
+        float add = 1 + 1.5;
+        float sub = 4.5 - 2;
+        float mul = 3 * 1.5;
+        float div = 5.0 / 2
       end
       """
-    shouldExit(src, ExitCode.SemanticError)
+    shouldExit(src, ExitCode.Success)
   }
 
   it should "reject modulo on floats" in {

@@ -83,6 +83,7 @@ final class LowerToTACTest extends AnyFunSuite {
     def mapInstr(i: TAC.Instr): TAC.Instr = i match {
       case TAC.BinOp(dst, op, lhs, rhs) => TAC.BinOp(canonTemp(dst), op, mapRhs(lhs), mapRhs(rhs))
       case TAC.UnOp(dst, op, x)         => TAC.UnOp(canonTemp(dst), op, mapRhs(x))
+      case TAC.IntToFloat(dst, value)   => TAC.IntToFloat(canonTemp(dst), mapRhs(value))
       case TAC.TACAssign(lhs, rhs)      => TAC.TACAssign(mapVal(lhs), mapRhs(rhs))
       case TAC.TACExit(code)            => TAC.TACExit(mapRhs(code))
       case p: TAC.Print =>
@@ -138,6 +139,19 @@ final class LowerToTACTest extends AnyFunSuite {
       TAC.BinOp(temp, TAC.FloatArithOp.Add, TAC.FloatValue(1.5f), TAC.FloatValue(2.25f)),
       TAC.PrintFloat(temp)
     ), Seq(temp))
+    assert(got == expect)
+  }
+
+  test("LowerToTAC: mixed arithmetic converts int operands before float operations") {
+    val expr = BinaryArithmetic(IntLit(2), FloatLit(1.5f), ArithmeticOperation.Add)
+    val got = lower(List(Print(expr)))
+    val converted = TAC.Temp(0, TAC.BitLength._32)
+    val result = TAC.Temp(1, TAC.BitLength._32)
+    val expect = TAC.TACProgram(Seq(), Seq(), Seq(
+      TAC.IntToFloat(converted, TAC.ImmValue(2)),
+      TAC.BinOp(result, TAC.FloatArithOp.Add, converted, TAC.FloatValue(1.5f)),
+      TAC.PrintFloat(result)
+    ), Seq(converted, result))
     assert(got == expect)
   }
 
@@ -775,5 +789,4 @@ final class LowerToTACTest extends AnyFunSuite {
     assert(body.exists { case TAC.PrintInt(_) => true; case _ => false })
   }
 }
-
 

@@ -5,6 +5,7 @@
 # -3.5
 # 3.5
 # 1.5
+# 3.5
 # true
 
 # Program:
@@ -25,5 +26,6 @@ begin
   println values[1];
   println values[0];
   println lower;
+  println 1 + 2.5;
   println result > y
 end

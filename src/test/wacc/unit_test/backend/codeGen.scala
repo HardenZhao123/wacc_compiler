@@ -44,6 +44,19 @@ class CodeGenTest extends AnyFlatSpec {
     asm.exists { case Adds(_, _, _) => true; case _ => false } shouldBe true
   }
 
+  it should "convert an integer to float with scvtf" in {
+    val converted = Temp(0, BitLength._32)
+    val p = TACProgram(
+      strs = Nil,
+      funcs = Nil,
+      body = List(IntToFloat(converted, ImmValue(2))),
+      locals = List(converted)
+    )
+
+    val asm = A64Generator.genA64Program(p)
+    asm.exists { case SCvtf(_, _) => true; case _ => false } shouldBe true
+  }
+
   it should "generate AArch64 instructions for a print statement: print 1" in {
     val p = TACProgram(
       strs = Nil,
