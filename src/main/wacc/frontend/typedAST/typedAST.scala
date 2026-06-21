@@ -114,7 +114,8 @@ object TypedStmt {
   case class Exit(expr: TypedExpr) extends TypedStmt
   case class Print(expr: TypedExpr) extends TypedStmt
   case class Println(expr: TypedExpr) extends TypedStmt
-  case class If(cond: TypedExpr, thenBranch: List[TypedStmt], elseBranch: List[TypedStmt]) extends TypedStmt
+  case class IfElse(cond: TypedExpr, thenBranch: List[TypedStmt], elseBranch: List[TypedStmt]) extends TypedStmt
+  case class If(cond: TypedExpr, thenBranch: List[TypedStmt]) extends TypedStmt
   case class While(cond: TypedExpr, body: List[TypedStmt]) extends TypedStmt
   case class TryCatch(tryBody: List[TypedStmt], handlers: List[TypedCatchHandler]) extends TypedStmt
   case class For(init: List[TypedStmt], cond: TypedExpr, update: List[TypedStmt], body: List[TypedStmt]) extends TypedStmt

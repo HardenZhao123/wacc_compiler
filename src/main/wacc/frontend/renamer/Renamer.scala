@@ -111,12 +111,18 @@ object Renamer {
     case BeginEnd(body) =>
       BeginEnd(renameStmt(body, funcs)(using ctx.newScope, st))(s.positionInfo)
 
-    // if statement: condition in current scope, each branch renamed in its own nested scope
-    case If(cond, thn, els) =>
+      // if statement
+    case If(cond, thn) =>
+      val cond2 = renameExpr(cond, funcs)
+      val thn2 = renameStmt(thn, funcs)(using ctx.newScope, st)
+      If(cond2, thn2)(s.positionInfo)
+
+    // if-else statement: condition in current scope, each branch renamed in its own nested scope
+    case IfElse(cond, thn, els) =>
       val cond2 = renameExpr(cond, funcs)
       val thn2 = renameStmt(thn, funcs)(using ctx.newScope, st)
       val els2 = renameStmt(els, funcs)(using ctx.newScope, st)
-      If(cond2, thn2, els2)(s.positionInfo)
+      IfElse(cond2, thn2, els2)(s.positionInfo)
 
     // while loop: condition in current scope, body renamed in a nested scope
     case While(cond, body) =>

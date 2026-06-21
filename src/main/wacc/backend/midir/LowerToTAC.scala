@@ -119,7 +119,9 @@ object LowerToTAC {
       val v = lowerExpr(expr)
       ftx.emit(TACExit(v))
 
-    case TypedStmt.If(cond, thn, els) => lowerIfElse(cond, thn, els)
+    case TypedStmt.IfElse(cond, thn, els) => lowerIfElse(cond, thn, els)
+
+    case TypedStmt.If(cond, thn) => lowerIf(cond, thn)
 
     case TypedStmt.While(cond, body) => lowerWhile(cond, body)
 
@@ -504,6 +506,15 @@ object LowerToTAC {
     ftx.emit(UnOp(dst, UnaryOp.Chr, ov))
     dst
   }
+
+  private def lowerIf(cond: TypedExpr, thenBranch: List[TypedStmt])
+                     (using ftx: FuncContext, lg: LabelGen, ctx: StringContext): Unit = {
+    val lEnd = lg.fresh(IF_LABEL_END)
+    lowerCondJumpFalse(cond, lEnd)
+    lowerStmts(thenBranch)
+    ftx.emit(Mark(lEnd))
+  }
+
   private def lowerIfElse(cond: TypedExpr, thenBranch: List[TypedStmt], elseBranch: List[TypedStmt])
                          (using ftx: FuncContext, lg: LabelGen, ctx: StringContext): Unit = {
     val lElse = lg.fresh(IF_LABEL_ELSE)

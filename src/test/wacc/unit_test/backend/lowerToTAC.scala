@@ -252,7 +252,7 @@ final class LowerToTACTest extends AnyFunSuite {
 
   test("LowerToTAC: simple if-else statement with skips") {
     val got = lower(List(
-      If(BinaryBool(BoolLit(true), BoolLit(false), BoolOperation.And),
+      IfElse(BinaryBool(BoolLit(true), BoolLit(false), BoolOperation.And),
         List(Skip()), List(Skip()))
     ))
 
@@ -457,7 +457,7 @@ final class LowerToTACTest extends AnyFunSuite {
       While(
         BinaryBool(BoolLit(true), BoolLit(false), BoolOperation.And),
         List(
-          If(
+          IfElse(
             BinaryBool(BoolLit(true), BoolLit(false), BoolOperation.Or),
             List(Skip()),
             List(Skip())
@@ -512,7 +512,7 @@ final class LowerToTACTest extends AnyFunSuite {
   test("LowerToTAC: while inside if lowers with correct head/end labels") {
     // if true then while true do skip done else skip fi
     val got = normalizeProgram(lower(List(
-      If(
+      IfElse(
         BoolLit(true),
         List(While(BoolLit(true), List(Skip()))),
         List(Skip())

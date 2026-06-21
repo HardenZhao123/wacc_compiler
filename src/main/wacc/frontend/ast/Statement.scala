@@ -34,7 +34,8 @@ object Stmt{
   case class Exit(e: Expr)(override val positionInfo: PositionInfo) extends Stmt
   case class Print(e: Expr)(override val positionInfo: PositionInfo) extends Stmt
   case class Println(e: Expr)(override val positionInfo: PositionInfo) extends Stmt
-  case class If(cond: Expr, thn: Stmt, els: Stmt)(override val positionInfo: PositionInfo) extends Stmt
+  case class IfElse(cond: Expr, thn: Stmt, els: Stmt)(override val positionInfo: PositionInfo) extends Stmt
+  case class If(cond: Expr, thn: Stmt)(override val positionInfo: PositionInfo) extends Stmt
   case class While(cond: Expr, body: Stmt)(override val positionInfo: PositionInfo) extends Stmt
   case class TryCatch(tryBody: Stmt, handlers: List[CatchHandler])(override val positionInfo: PositionInfo) extends Stmt
   case class For(init: Stmt, cond: Expr, update: Stmt, body: Stmt)(override val positionInfo: PositionInfo) extends Stmt
@@ -55,7 +56,8 @@ object Stmt{
   object Exit extends ParserBridgePos1[Expr, Exit]
   object Print extends ParserBridgePos1[Expr, Print]
   object Println extends ParserBridgePos1[Expr, Println]
-  object If extends ParserBridgePos3[Expr, Stmt, Stmt, If]
+  object IfElse extends ParserBridgePos3[Expr, Stmt, Stmt, IfElse]
+  object If extends ParserBridgePos2[Expr, Stmt, If]
   object While extends ParserBridgePos2[Expr, Stmt, While]
   object For extends ParserBridgePos4[Stmt, Expr, Stmt, Stmt, For]
   object DoWhile extends ParserBridgePos2[Stmt, Expr, DoWhile]
