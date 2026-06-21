@@ -122,6 +122,10 @@ object A64Instr {
     val opcode = "fcvt"
     override def operands = Seq(dest, src)
   }
+  case class SCvtf(dest: S, src: A64Reg) extends AsmInstr {
+    val opcode = "scvtf"
+    override def operands = Seq(dest, src)
+  }
 
   // Branch instructions
   sealed trait BranchInstr extends AsmInstr {

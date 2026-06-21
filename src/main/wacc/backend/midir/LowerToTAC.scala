@@ -280,6 +280,27 @@ object LowerToTAC {
     dst
   }
 
+  private def lowerAsFloat(expr: TypedExpr)(using ftx: FuncContext, lg: LabelGen, ctx: StringContext): Rhs = {
+    val value = lowerExpr(expr)
+    expr.ty match {
+      case SemFloat => value
+      case SemInt =>
+        val converted = ftx.fresh(BitLength._32)
+        ftx.emit(IntToFloat(converted, value))
+        converted
+      case other => throw new Exception(s"cannot convert ${SemanticType.show(other)} to float")
+    }
+  }
+
+  private def lowerFloatBinaryOp(left: TypedExpr, right: TypedExpr, op: FloatArithOp)
+                                (using ftx: FuncContext, lg: LabelGen, ctx: StringContext): Rhs = {
+    val lv = lowerAsFloat(left)
+    val rv = lowerAsFloat(right)
+    val dst = ftx.fresh(BitLength._32)
+    ftx.emit(BinOp(dst, op, lv, rv))
+    dst
+  }
+
   private def lowerShortCircuitBool(left: TypedExpr, right: TypedExpr, op: TypedExpr.BoolOperation)
                                    (using ftx: FuncContext, lg: LabelGen, ctx: StringContext): Rhs = {
     val dst = ftx.fresh(BitLength._8)
@@ -322,7 +343,7 @@ object LowerToTAC {
           case TypedExpr.ArithmeticOperation.Div => FloatArithOp.Div
           case TypedExpr.ArithmeticOperation.Mod => throw new Exception("float modulo is not supported")
         }
-        lowerBinaryOp(left, right, ba.ty, floatOp)
+        lowerFloatBinaryOp(left, right, floatOp)
       } else op match {
         case TypedExpr.ArithmeticOperation.Add => if ftx.currentExceptionHandler.isDefined then lowerCheckedArithmetic(left, right, ba.ty, ArithOp.Add) else lowerBinaryOp(left, right, ba.ty, ArithOp.Add)
         case TypedExpr.ArithmeticOperation.Sub => if ftx.currentExceptionHandler.isDefined then lowerCheckedArithmetic(left, right, ba.ty, ArithOp.Sub) else lowerBinaryOp(left, right, ba.ty, ArithOp.Sub)

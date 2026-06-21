@@ -167,6 +167,13 @@ object A32Generator {
         cs.frame.storeTemp(dest, reg)
       }
 
+    case TAC.IntToFloat(dst, value) =>
+      cs.withEval(value) { reg =>
+        gr.emit(Mov(RETURN_REG, reg))
+        gr.emit(Bl(Label(AEABI_I2F)))
+        cs.frame.storeTemp(dst, RETURN_REG)
+      }
+
     // Binary operations
     case TAC.BinOp(dst, op, lhs, rhs) =>
       cs.withEval2(lhs, rhs) { (lreg, rreg) =>

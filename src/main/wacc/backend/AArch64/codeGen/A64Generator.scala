@@ -152,6 +152,15 @@ object A64Generator {
         cs.frame.storeTemp(dest, reg, cs.ra)
       }
 
+    case IntToFloat(dst, value) =>
+      cs.withEval(value) { reg =>
+        val valueW = toW(reg)
+        val converted = S(0)
+        gr.emit(SCvtf(converted, valueW))
+        gr.emit(FMov(valueW, converted))
+        cs.frame.storeTemp(dst, valueW, cs.ra)
+      }
+
     case BinOp(dst, op, lhs, rhs) =>
       op match {
         case f: TAC.FloatArithOp =>
