@@ -1,0 +1,17 @@
+# select a floating-point case
+
+# Output:
+# medium
+#
+
+# Program:
+
+begin
+  float size = 2.5;
+  switch (size)
+    case 1.5: println "small"
+    case 2.5: println "medium"
+    case 3.5: println "large"
+    default: println "unknown"
+  end
+end

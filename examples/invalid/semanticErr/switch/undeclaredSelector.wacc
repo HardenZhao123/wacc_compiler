@@ -1,0 +1,16 @@
+# switch selector is not declared
+
+# Output:
+# #semantic_error#
+
+# Exit:
+# 200
+
+# Program:
+
+begin
+  switch (missing)
+    case 1: println "one"
+    default: println "other"
+  end
+end

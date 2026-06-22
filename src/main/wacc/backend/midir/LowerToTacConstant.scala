@@ -5,6 +5,8 @@ object LowerToTacConstant {
   val SC_LABEL_PREFIX_OR  = "or"
   val IF_LABEL_ELSE = "if_else"
   val IF_LABEL_END  = "if_end"
+  val SWITCH_CASE = "switch_case"
+  val SWITCH_END = "switch_end"
   val WHILE_LABEL_HEAD = "while_head"
   val WHILE_LABEL_END  = "while_end"
   val DO_WHILE_COND = "do_while_cond"

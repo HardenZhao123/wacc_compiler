@@ -303,6 +303,89 @@ final class LowerToTACTest extends AnyFunSuite {
     assert(normalizeProgram(got) == normalizeProgram(expected))
   }
 
+  test("LowerToTAC: switch dispatches grouped labels and falls back to default") {
+    val got = lower(List(
+      Switch(IntLit(3), List(
+        TypedSwitchCaseBody(
+          List(TypedSwitchLabel.TypedCaseLabel(IntLit(1))),
+          List(Print(IntLit(10)))
+        ),
+        TypedSwitchCaseBody(
+          List(
+            TypedSwitchLabel.TypedCaseLabel(IntLit(2)),
+            TypedSwitchLabel.TypedCaseLabel(IntLit(3))
+          ),
+          List(Print(IntLit(20)))
+        ),
+        TypedSwitchCaseBody(
+          List(TypedSwitchLabel.TypedDefaultLabel()),
+          List(Print(IntLit(30)))
+        )
+      ))
+    ))
+
+    val expected = TAC.TACProgram(Seq(), Seq(), Seq(
+      TAC.CmpJmp(TAC.CondOp.EQ, ImmValue(3), ImmValue(1), Label("case_one")),
+      TAC.CmpJmp(TAC.CondOp.EQ, ImmValue(3), ImmValue(2), Label("case_two")),
+      TAC.CmpJmp(TAC.CondOp.EQ, ImmValue(3), ImmValue(3), Label("case_two")),
+      TAC.Jmp(Label("default_case")),
+      TAC.Mark(Label("case_one")),
+      TAC.PrintInt(ImmValue(10)),
+      TAC.Jmp(Label("switch_end")),
+      TAC.Mark(Label("case_two")),
+      TAC.PrintInt(ImmValue(20)),
+      TAC.Jmp(Label("switch_end")),
+      TAC.Mark(Label("default_case")),
+      TAC.PrintInt(ImmValue(30)),
+      TAC.Jmp(Label("switch_end")),
+      TAC.Mark(Label("switch_end"))
+    ), Seq())
+
+    assert(normalizeProgram(got) == normalizeProgram(expected))
+  }
+
+  test("LowerToTAC: switch evaluates its selector once") {
+    val selector = BinaryArithmetic(IntLit(1), IntLit(2), ArithmeticOperation.Add)
+    val got = lower(List(
+      Switch(selector, List(
+        TypedSwitchCaseBody(
+          List(
+            TypedSwitchLabel.TypedCaseLabel(IntLit(1)),
+            TypedSwitchLabel.TypedCaseLabel(IntLit(3))
+          ),
+          List(Skip())
+        )
+      ))
+    ))
+
+    assert(got.body.count {
+      case TAC.BinOp(_, TAC.ArithOp.Add, _, _) => true
+      case _ => false
+    } == 1)
+
+    val comparisons = got.body.collect {
+      case TAC.CmpJmp(TAC.CondOp.EQ, lhs, _, _) => lhs
+    }
+    assert(comparisons.size == 2)
+    assert(comparisons.distinct.size == 1)
+  }
+
+  test("LowerToTAC: float switch uses floating-point equality") {
+    val got = lower(List(
+      Switch(FloatLit(1.5f), List(
+        TypedSwitchCaseBody(
+          List(TypedSwitchLabel.TypedCaseLabel(FloatLit(1.5f))),
+          List(Skip())
+        )
+      ))
+    ))
+
+    assert(got.body.exists {
+      case TAC.BinOp(_, TAC.FloatCondOp.EQ, TAC.FloatValue(1.5f, _), TAC.FloatValue(1.5f, _)) => true
+      case _ => false
+    })
+  }
+
   private def idxOfFirst(body: List[TAC.Instr])(p: TAC.Instr => Boolean): Int =
     body.indexWhere(p)
 
@@ -789,4 +872,3 @@ final class LowerToTACTest extends AnyFunSuite {
     assert(body.exists { case TAC.PrintInt(_) => true; case _ => false })
   }
 }
-

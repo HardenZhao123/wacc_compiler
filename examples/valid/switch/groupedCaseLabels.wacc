@@ -1,0 +1,16 @@
+# multiple case labels sharing one body
+
+# Output:
+# passing grade
+#
+
+# Program:
+
+begin
+  char grade = 'B';
+  switch (grade)
+    case 'A': case 'B': case 'C': println "passing grade"
+    case 'D': println "resit required"
+    default: println "unknown grade"
+  end
+end

@@ -123,6 +123,8 @@ object LowerToTAC {
 
     case TypedStmt.If(cond, thn) => lowerIf(cond, thn)
 
+    case TypedStmt.Switch(selector, cases) => lowerSwitch(selector, cases)
+
     case TypedStmt.While(cond, body) => lowerWhile(cond, body)
 
     case TypedStmt.TryCatch(tryBody, handlers) => {
@@ -524,6 +526,47 @@ object LowerToTAC {
     lowerCondBodyJump(cond, thenBranch, lElse, lEnd)
     lowerStmts(elseBranch)
     ftx.emit(Mark(lEnd))
+  }
+
+  private def lowerSwitch(selector: TypedExpr, cases: List[TypedSwitchCaseBody])
+                         (using ftx: FuncContext, lg: LabelGen, ctx: StringContext): Unit = {
+    val selectorValue = lowerExpr(selector)
+    val endLabel = lg.fresh(SWITCH_END)
+    val caseLabels = cases.map(_ => lg.fresh(SWITCH_CASE))
+
+    val defaultTarget = cases.zip(caseLabels).collectFirst {
+      case (switchCase, target)
+          if switchCase.labels.exists {
+            case TypedSwitchLabel.TypedDefaultLabel() => true
+            case _ => false
+          } => target
+    }
+
+    // Dispatch is emitted before every body so a match cannot accidentally execute
+    // label expressions belonging to a later case.
+    cases.zip(caseLabels).foreach { (switchCase, target) =>
+      switchCase.labels.foreach {
+        case TypedSwitchLabel.TypedCaseLabel(value) =>
+          val caseValue = lowerExpr(value)
+          if selector.ty == SemFloat then {
+            val matches = ftx.fresh(BitLength._8)
+            ftx.emit(BinOp(matches, FloatCondOp.EQ, selectorValue, caseValue))
+            ftx.emit(CmpJmp(CondOp.NEQ, matches, ImmValue(0, BitLength._8), target))
+          } else {
+            ftx.emit(CmpJmp(CondOp.EQ, selectorValue, caseValue, target))
+          }
+        case TypedSwitchLabel.TypedDefaultLabel() => ()
+      }
+    }
+
+    ftx.emit(Jmp(defaultTarget.getOrElse(endLabel)))
+
+    cases.zip(caseLabels).foreach { (switchCase, target) =>
+      ftx.emit(Mark(target))
+      lowerStmts(switchCase.body)
+      ftx.emit(Jmp(endLabel))
+    }
+    ftx.emit(Mark(endLabel))
   }
 
   private def lowerCondJumpFalse(cond: TypedExpr, elseLabel: Label)
