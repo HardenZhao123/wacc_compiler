@@ -110,8 +110,8 @@ object Renamer {
 
     case BeginEnd(body) =>
       BeginEnd(renameStmt(body, funcs)(using ctx.newScope, st))(s.positionInfo)
-
-      // if statement
+      
+    // if statement
     case If(cond, thn) =>
       val cond2 = renameExpr(cond, funcs)
       val thn2 = renameStmt(thn, funcs)(using ctx.newScope, st)
@@ -123,6 +123,12 @@ object Renamer {
       val thn2 = renameStmt(thn, funcs)(using ctx.newScope, st)
       val els2 = renameStmt(els, funcs)(using ctx.newScope, st)
       IfElse(cond2, thn2, els2)(s.positionInfo)
+      
+    // Switch statement  
+    case Switch(selector, cases) => 
+      val selector2 = renameExpr(selector, funcs)
+      val cases2 = cases.map(c => renameSwitchCaseBody(c, funcs))
+      Switch(selector2, cases2)(s.positionInfo)
 
     // while loop: condition in current scope, body renamed in a nested scope
     case While(cond, body) =>
@@ -264,5 +270,22 @@ object Renamer {
     val body2 = renameStmt(h.body, funcs)(using catchScope, st)
 
     CatchHandler(h.exType, exName2, body2)(h.positionInfo)
+  }
+  
+  private def renameSwitchCaseBody(switchCaseBody: SwitchCaseBody, funcs: Map[String, PositionInfo])
+                                  (using ctx: RenamerScope, st: RenamerState): SwitchCaseBody = {
+    val labels2 = switchCaseBody.labels.map(label => renameSwitchLabel(label, funcs))
+    val body2 = switchCaseBody.body.map(b => renameStmt(b, funcs))
+    SwitchCaseBody(labels2, body2)(switchCaseBody.positionInfo)
+  }
+  
+  private def renameSwitchLabel(label: SwitchLabel, funcs: Map[String, PositionInfo])
+                               (using ctx: RenamerScope, st: RenamerState): SwitchLabel = {
+    label match {
+      case SwitchLabel.CaseLabel(value) => 
+        val value2 = renameExpr(value, funcs)
+        SwitchLabel.CaseLabel(value2)(label.positionInfo)
+      case SwitchLabel.DefaultLabel() => SwitchLabel.DefaultLabel()(label.positionInfo)
+    }
   }
 }

@@ -170,6 +170,26 @@ object TypeCheckerStmt {
 
       Some(TypedStmt.IfElse(condTypedExpr, thenTypedStmts, elseTypedStmts))
 
+    case Switch(selector, cases) =>
+      val (selectorTyOpt, selectorTypedExpr) = TypeCheckerExpr.checkExpr(selector, Constraint.UnConstraint)
+      val selectorTy = selectorTyOpt.getOrElse(SemUnknown)
+
+      val typedCases = cases.map(c =>
+        val typedSwitchLabels = c.labels.map {
+          case SwitchLabel.DefaultLabel() => TypedSwitchLabel.TypedDefaultLabel()
+          case SwitchLabel.CaseLabel(value) =>
+            val (_, typedValueExpr) = TypeCheckerExpr.checkExpr(value, Constraint.Is(selectorTy))
+            TypedSwitchLabel.TypedCaseLabel(typedValueExpr)
+
+        }
+
+        val typedBody = checkStmtList(c.body)
+
+        TypedSwitchCaseBody(typedSwitchLabels, typedBody)
+      )
+
+      Some(TypedStmt.Switch(selectorTypedExpr, typedCases))
+
     // While loop
     case While(cond, body) =>
       val (_, condTypedExpr) = TypeCheckerExpr.checkExpr(cond, Constraint.Is(SemBool))
@@ -272,5 +292,13 @@ object TypeCheckerStmt {
     ctx.loopDepth += 1
     try f
     finally ctx.loopDepth -= 1
+  }
+
+  private def checkStmtList(stmts: List[Stmt])
+                           (using ctx: TypeChecker.TypeCheckerCtx): List[TypedStmt] = {
+    stmts.flatMap {
+      case SeqStmt(inner) => inner.flatMap(checkStmt)
+      case stmt          => checkStmt(stmt).toList
+    }
   }
 }

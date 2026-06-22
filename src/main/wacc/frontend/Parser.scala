@@ -259,6 +259,40 @@ object parser {
 
     private lazy val ifP: Parsley[Stmt] = If("if" ~> expr, "then" ~> stmtP <~ "fi")
 
+    private lazy val switchP: Parsley[Stmt] = Switch(
+        "switch (" ~> expr <~ ")",
+        many(switchCaseBody) <~ "end"
+    )
+
+    private lazy val switchCaseBody =
+        withPos(
+            for {
+                labels <- some(switchLabel)
+                body <- many(stmtP)
+            } yield (labels, body)
+        ) {
+            case ((labels, body), p) => SwitchCaseBody(labels, body)(p)
+        }
+
+    private lazy val switchLabel: Parsley[SwitchLabel] =
+        withPos(
+            for {
+                _ <- "case"
+                exp <- expr
+                _ <- ":"
+            } yield (exp)
+        ) {
+            case ((exp), p) => SwitchLabel.CaseLabel(exp)(p)
+        } |
+          withPos(
+              for {
+                  _ <- "default"
+                  _ <- ":"
+              } yield ()
+          ) {
+              case (_, p) => SwitchLabel.DefaultLabel()(p)
+          }
+
     private lazy val readP: Parsley[Stmt] = Read("read" ~> lvalueP)
 
     private lazy val freeP: Parsley[Stmt] = Free("free" ~> expr)
@@ -273,7 +307,7 @@ object parser {
     private lazy val stmtAtom: Parsley[Stmt] =
         skipP <|> atomic(ifElseP) <|> ifP <|> whileP <|> forP <|> beginP <|> tryCatchP
       <|> doWhileP <|> breakP <|> continueP <|> declP <|> assignP <|> readP <|> freeP
-      <|> returnP <|> throwP <|> exitP <|> printP <|> printlnP
+      <|> returnP <|> throwP <|> exitP <|> printP <|> printlnP <|> switchP
 
     // Sequencing: parse one-or-more statements separated by ';' and only wrap in SeqStmt when needed.
     private lazy val stmtP: Parsley[Stmt] =

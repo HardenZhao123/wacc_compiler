@@ -2,6 +2,7 @@ package wacc.frontend.returnCheck
 
 import wacc.frontend.ast.Stmt.*
 import wacc.frontend.ast.{Stmt, Program}
+import wacc.frontend.ast.SwitchLabel.DefaultLabel
 
 import scala.collection.mutable
 
@@ -15,6 +16,20 @@ object ReturnCheck {
     case IfElse(_, thn, els) =>
       // Both branches must terminate to guarantee the if-statement as a whole returns.
       isReturning(thn) && isReturning(els)
+
+    case Switch(_, cases) => 
+      // All cases must return, and the switch statement must contain the default case
+      val hasDefault = cases.exists { c =>
+        c.labels.exists {
+          case _: DefaultLabel => true
+          case _ => false
+        }
+      }
+      val allCasesReturn = cases.forall { c =>
+        c.body.lastOption.exists(isReturning)
+      }
+
+      hasDefault && allCasesReturn
 
     case TryCatch(tryBody, handlers) => 
       // Every catch path must also terminate; otherwise control could still fall through.
