@@ -141,3 +141,5 @@ Useful production settings / 常用生产环境配置：
 Keep compiler changes and web-service changes covered by the relevant tests. Do not commit generated binaries, build output, or temporary files. Use a focused commit message that describes the user-visible change or the compiler component affected.
 
 修改编译器或 Web 服务时，请运行对应测试。不要提交生成的二进制文件、构建产物或临时文件。提交信息应聚焦描述用户可见的变化，或受影响的编译器组件。
+
+## 王哥到此一游: Charlie Wang involved in part of this project :D
