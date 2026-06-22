@@ -170,6 +170,28 @@ object TypeCheckerStmt {
 
       Some(TypedStmt.IfElse(condTypedExpr, thenTypedStmts, elseTypedStmts))
 
+    case Switch(selector, cases) =>
+      val (selectorTyOpt, selectorTypedExpr) = TypeCheckerExpr.checkExpr(selector, Constraint.UnConstraint)
+      val selectorTy = selectorTyOpt.getOrElse(SemUnknown)
+
+      val typedCases = withBreakableDepth {
+        cases.map(c =>
+          val typedSwitchLabels = c.labels.map {
+            case SwitchLabel.DefaultLabel() => TypedSwitchLabel.TypedDefaultLabel()
+            case SwitchLabel.CaseLabel(value) =>
+              val (_, typedValueExpr) = TypeCheckerExpr.checkExpr(value, Constraint.Is(selectorTy))
+              TypedSwitchLabel.TypedCaseLabel(typedValueExpr)
+
+          }
+
+          val typedBody = checkStmtList(c.body)
+
+          TypedSwitchCaseBody(typedSwitchLabels, typedBody)
+        )
+      }
+
+      Some(TypedStmt.Switch(selectorTypedExpr, typedCases))
+
     // While loop
     case While(cond, body) =>
       val (_, condTypedExpr) = TypeCheckerExpr.checkExpr(cond, Constraint.Is(SemBool))
@@ -227,7 +249,7 @@ object TypeCheckerStmt {
       Some(TypedStmt.DoWhile(bodyTypedStmt, condTypedExpr))
 
     case Break() =>
-      if (ctx.loopDepth <= 0) {
+      if (ctx.breakableDepth <= 0) {
         ctx.addError(BreakOutsideLoop(stmt.positionInfo))
       }
       Some(TypedStmt.Break())
@@ -268,9 +290,27 @@ object TypeCheckerStmt {
   }
 
   private def withLoopDepth[A](f: => A)(using ctx: TypeChecker.TypeCheckerCtx): A = {
-    // Track nesting centrally so break/continue validation stays consistent across while/for/do-while.
+    // Loops accept both break and continue.
     ctx.loopDepth += 1
+    ctx.breakableDepth += 1
     try f
-    finally ctx.loopDepth -= 1
+    finally {
+      ctx.loopDepth -= 1
+      ctx.breakableDepth -= 1
+    }
+  }
+
+  private def withBreakableDepth[A](f: => A)(using ctx: TypeChecker.TypeCheckerCtx): A = {
+    ctx.breakableDepth += 1
+    try f
+    finally ctx.breakableDepth -= 1
+  }
+
+  private def checkStmtList(stmts: List[Stmt])
+                           (using ctx: TypeChecker.TypeCheckerCtx): List[TypedStmt] = {
+    stmts.flatMap {
+      case SeqStmt(inner) => inner.flatMap(checkStmt)
+      case stmt          => checkStmt(stmt).toList
+    }
   }
 }

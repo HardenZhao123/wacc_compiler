@@ -1,0 +1,17 @@
+# switch case label has a different type from the selector
+
+# Output:
+# #semantic_error#
+
+# Exit:
+# 200
+
+# Program:
+
+begin
+  int value = 1;
+  switch (value)
+    case true: println "invalid case"
+    default: println "default"
+  end
+end

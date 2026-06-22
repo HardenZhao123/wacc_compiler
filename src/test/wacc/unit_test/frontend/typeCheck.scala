@@ -642,7 +642,7 @@ class TypeCheckerTest extends AnyFlatSpec {
     shouldExit(src, ExitCode.Success)
   }
 
-  it should "reject break outside loops" in {
+  it should "reject break outside loops and switches" in {
     val src =
       """
       begin
@@ -650,6 +650,50 @@ class TypeCheckerTest extends AnyFlatSpec {
       end
       """
     shouldExit(src, ExitCode.SemanticError)
+  }
+
+  it should "accept break inside a switch" in {
+    val src =
+      """
+      begin
+        int value = 1;
+        switch (value)
+          case 1: println "one"; Break
+          default: println "other"
+        end
+      end
+      """
+    shouldExit(src, ExitCode.Success)
+  }
+
+  it should "reject continue inside a switch outside a loop" in {
+    val src =
+      """
+      begin
+        int value = 1;
+        switch (value)
+          case 1: Continue
+          default: skip
+        end
+      end
+      """
+    shouldExit(src, ExitCode.SemanticError)
+  }
+
+  it should "accept continue inside a switch nested in a loop" in {
+    val src =
+      """
+      begin
+        while true do
+          switch (1)
+            case 1: Continue
+            default: Break
+          end;
+          Break
+        done
+      end
+      """
+    shouldExit(src, ExitCode.Success)
   }
 
   it should "accept throw with exception of string and reject throw with exception of int" in {

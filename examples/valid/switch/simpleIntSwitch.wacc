@@ -1,0 +1,16 @@
+# select one integer case
+
+# Output:
+# two
+#
+
+# Program:
+
+begin
+  int choice = 2;
+  switch (choice)
+    case 1: println "one"; Break
+    case 2: println "two"; Break
+    default: println "other"
+  end
+end

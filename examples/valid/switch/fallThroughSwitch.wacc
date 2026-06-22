@@ -1,0 +1,18 @@
+# continue into the following case until break is reached
+
+# Output:
+# two
+# three
+#
+
+# Program:
+
+begin
+  int value = 2;
+  switch (value)
+    case 1: println "one"
+    case 2: println "two"
+    case 3: println "three"; Break
+    default: println "default"
+  end
+end

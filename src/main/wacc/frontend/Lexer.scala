@@ -11,11 +11,11 @@ object lexer {
     // and are recognised directly by the lexer.
     private final val hardKeyWords: Set[String] = Set(
         "int", "char", "float", "string", "bool", "pair", "null",
-        "true", "false", "begin", "end", "is", "skip",
+        "true", "false", "begin", "end", "is", "skip", "switch", "case",
         "read", "free", "return", "throw", "exit", "print", "println",
         "if", "then", "else", "fi", "while", "do", "done",
         "newpair", "fst", "snd", "call", "len", "ord", "chr",
-        "try", "catch", "for", "Break", "Continue",
+        "try", "catch", "for", "Break", "Continue", "default",
         "ArrayOutOfBoundsException", "BadCharException",
         "ArithmeticException", "IntegerOverflowException",
         "NullDereferenceException", "Exception"

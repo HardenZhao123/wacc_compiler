@@ -183,6 +183,37 @@ class StmtParserTest extends AnyFlatSpec with ParserTestHelpers {
     }
   }
 
+  it should "parse a simple switch statement" in {
+    p.parseStmt("switch (x) end") match {
+      case Success(Switch(Identifier("x"), List())) => succeed
+      case Success(other)                           => fail(s"Unexpected parse result: $other")
+      case Failure(err)                             => fail(s"Parsing failed: $err")
+    }
+  }
+
+  it should "parse a switch statement with cases" in {
+    p.parseStmt("switch (x) case 1: skip case 2: case 3: skip end") match {
+      case Success(Switch(Identifier("x"), List(
+         SwitchCaseBody(List(SwitchLabel.CaseLabel(IntLiter(1))), List(Skip())),
+         SwitchCaseBody(List(SwitchLabel.CaseLabel(IntLiter(2)), SwitchLabel.CaseLabel(IntLiter(3))), List(Skip()))
+      ))) => succeed
+      case Success(other)                           => fail(s"Unexpected parse result: $other")
+      case Failure(err)                             => fail(s"Parsing failed: $err")
+    }
+  }
+
+  it should "parse a switch statement with case and default" in {
+    p.parseStmt("switch (x) case 1: println x; skip case 2: case 3: skip default: end") match {
+      case Success(Switch(Identifier("x"), List(
+      SwitchCaseBody(List(SwitchLabel.CaseLabel(IntLiter(1))), List(SeqStmt(List(Println(Identifier("x")), Skip())))),
+      SwitchCaseBody(List(SwitchLabel.CaseLabel(IntLiter(2)), SwitchLabel.CaseLabel(IntLiter(3))), List(Skip())),
+      SwitchCaseBody(List(SwitchLabel.DefaultLabel()), Nil)
+      ))) => succeed
+      case Success(other) => fail(s"Unexpected parse result: $other")
+      case Failure(err) => fail(s"Parsing failed: $err")
+    }
+  }
+
   it should "parse variable declaration" in {
     p.parseStmt("int x = 1 + 2") match {
       case Success(Decl(IntType(), Identifier("x"), RExpr(Add(IntLiter(1), IntLiter(2))))) => succeed
@@ -450,4 +481,3 @@ class StmtParserTest extends AnyFlatSpec with ParserTestHelpers {
     }
   }
 }
-

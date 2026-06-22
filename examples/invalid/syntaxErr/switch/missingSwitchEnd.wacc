@@ -1,0 +1,16 @@
+# switch statement is missing its closing end
+
+# Output:
+# #syntax_error#
+
+# Exit:
+# 100
+
+# Program:
+
+begin
+  int value = 1;
+  switch (value)
+    case 1: println "one"
+    default: println "other"
+end

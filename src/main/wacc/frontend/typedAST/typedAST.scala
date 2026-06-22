@@ -75,6 +75,16 @@ object TypedException {
   case class GeneralEx(msg: TypedExpr) extends TypedException(SemString)
 }
 
+// Typed SwitchLabel
+sealed trait TypedSwitchLabel
+object TypedSwitchLabel {
+  case class TypedCaseLabel(value: TypedExpr) extends TypedSwitchLabel
+  case class TypedDefaultLabel() extends TypedSwitchLabel
+}
+
+// Typed SwitchCaseBody
+case class TypedSwitchCaseBody(labels: List[TypedSwitchLabel], body: List[TypedStmt])
+
 /* Typed L-values */
 sealed abstract class TypedLValue(ty: SemanticType) extends TypedExpr(ty)
 object TypedLValue {
@@ -116,6 +126,7 @@ object TypedStmt {
   case class Println(expr: TypedExpr) extends TypedStmt
   case class IfElse(cond: TypedExpr, thenBranch: List[TypedStmt], elseBranch: List[TypedStmt]) extends TypedStmt
   case class If(cond: TypedExpr, thenBranch: List[TypedStmt]) extends TypedStmt
+  case class Switch(selector: TypedExpr, cases: List[TypedSwitchCaseBody]) extends TypedStmt
   case class While(cond: TypedExpr, body: List[TypedStmt]) extends TypedStmt
   case class TryCatch(tryBody: List[TypedStmt], handlers: List[TypedCatchHandler]) extends TypedStmt
   case class For(init: List[TypedStmt], cond: TypedExpr, update: List[TypedStmt], body: List[TypedStmt]) extends TypedStmt

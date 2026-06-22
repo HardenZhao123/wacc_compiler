@@ -21,6 +21,26 @@ object Program extends ParserBridgePos2[List[Func], Stmt, Program]
 case class CatchHandler(exType: WACCExceptionType, exName: Identifier, body: Stmt)
                        (val positionInfo: PositionInfo)
 
+// Label for switch statement (case / default)
+sealed trait SwitchLabel {
+  val positionInfo: PositionInfo
+}
+
+// Object for the SwitchLabel
+object SwitchLabel {
+  case class CaseLabel(value: Expr)(override val positionInfo: PositionInfo) extends SwitchLabel
+  case class DefaultLabel()(override val positionInfo: PositionInfo) extends SwitchLabel
+
+  object CaseLabel extends ParserBridgePos1[Expr, CaseLabel]
+  object DefaultLabel extends ParserSingletonBridgePos[DefaultLabel] {
+    override def con(pos: PositionInfo): DefaultLabel = DefaultLabel()(pos)
+  }
+}
+
+// SwitchCaseBody, e.g. case x1: case x2: int x = 1; break
+case class SwitchCaseBody(labels: List[SwitchLabel], body: List[Stmt])(val positionInfo: PositionInfo)
+object SwitchCaseBody extends ParserBridgePos2[List[SwitchLabel], List[Stmt], SwitchCaseBody]
+
 // stmt
 sealed trait Stmt { val positionInfo: PositionInfo }
 object Stmt{
@@ -36,6 +56,7 @@ object Stmt{
   case class Println(e: Expr)(override val positionInfo: PositionInfo) extends Stmt
   case class IfElse(cond: Expr, thn: Stmt, els: Stmt)(override val positionInfo: PositionInfo) extends Stmt
   case class If(cond: Expr, thn: Stmt)(override val positionInfo: PositionInfo) extends Stmt
+  case class Switch(selector: Expr, cases: List[SwitchCaseBody])(override val positionInfo: PositionInfo) extends Stmt
   case class While(cond: Expr, body: Stmt)(override val positionInfo: PositionInfo) extends Stmt
   case class TryCatch(tryBody: Stmt, handlers: List[CatchHandler])(override val positionInfo: PositionInfo) extends Stmt
   case class For(init: Stmt, cond: Expr, update: Stmt, body: Stmt)(override val positionInfo: PositionInfo) extends Stmt
@@ -58,6 +79,7 @@ object Stmt{
   object Println extends ParserBridgePos1[Expr, Println]
   object IfElse extends ParserBridgePos3[Expr, Stmt, Stmt, IfElse]
   object If extends ParserBridgePos2[Expr, Stmt, If]
+  object Switch extends ParserBridgePos2[Expr, List[SwitchCaseBody], Switch]
   object While extends ParserBridgePos2[Expr, Stmt, While]
   object For extends ParserBridgePos4[Stmt, Expr, Stmt, Stmt, For]
   object DoWhile extends ParserBridgePos2[Stmt, Expr, DoWhile]

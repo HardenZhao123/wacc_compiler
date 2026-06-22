@@ -34,6 +34,7 @@ object TypeChecker {
     var isFunction: Boolean = false
     var currentReturnType: Option[SemanticType] = None
     var loopDepth: Int = 0
+    var breakableDepth: Int = 0
 
     /* Lookup the type of a variable, returns SemUnknown if not found */
     def returnVariableType(name: String): SemanticType =
