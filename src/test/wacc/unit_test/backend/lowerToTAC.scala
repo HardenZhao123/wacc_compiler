@@ -308,14 +308,14 @@ final class LowerToTACTest extends AnyFunSuite {
       Switch(IntLit(3), List(
         TypedSwitchCaseBody(
           List(TypedSwitchLabel.TypedCaseLabel(IntLit(1))),
-          List(Print(IntLit(10)))
+          List(Print(IntLit(10)), Break())
         ),
         TypedSwitchCaseBody(
           List(
             TypedSwitchLabel.TypedCaseLabel(IntLit(2)),
             TypedSwitchLabel.TypedCaseLabel(IntLit(3))
           ),
-          List(Print(IntLit(20)))
+          List(Print(IntLit(20)), Break())
         ),
         TypedSwitchCaseBody(
           List(TypedSwitchLabel.TypedDefaultLabel()),
@@ -337,11 +337,72 @@ final class LowerToTACTest extends AnyFunSuite {
       TAC.Jmp(Label("switch_end")),
       TAC.Mark(Label("default_case")),
       TAC.PrintInt(ImmValue(30)),
-      TAC.Jmp(Label("switch_end")),
       TAC.Mark(Label("switch_end"))
     ), Seq())
 
     assert(normalizeProgram(got) == normalizeProgram(expected))
+  }
+
+  test("LowerToTAC: switch falls through until an explicit break") {
+    val got = lower(List(
+      Switch(IntLit(2), List(
+        TypedSwitchCaseBody(
+          List(TypedSwitchLabel.TypedCaseLabel(IntLit(1))),
+          List(Print(IntLit(10)))
+        ),
+        TypedSwitchCaseBody(
+          List(TypedSwitchLabel.TypedCaseLabel(IntLit(2))),
+          List(Print(IntLit(20)))
+        ),
+        TypedSwitchCaseBody(
+          List(TypedSwitchLabel.TypedCaseLabel(IntLit(3))),
+          List(Print(IntLit(30)), Break())
+        ),
+        TypedSwitchCaseBody(
+          List(TypedSwitchLabel.TypedDefaultLabel()),
+          List(Print(IntLit(40)))
+        )
+      ))
+    ))
+
+    val body = got.body.toList
+    val endLabel = body.last match {
+      case TAC.Mark(label) => label
+      case other => fail(s"expected switch end label, got: $other")
+    }
+    val print20 = body.indexOf(TAC.PrintInt(ImmValue(20)))
+    val print30 = body.indexOf(TAC.PrintInt(ImmValue(30)))
+
+    assert(print20 >= 0 && body(print20 + 1).isInstanceOf[TAC.Mark])
+    assert(print30 >= 0 && body(print30 + 1) == TAC.Jmp(endLabel))
+  }
+
+  test("LowerToTAC: switch break and enclosing-loop continue use different targets") {
+    val got = lower(List(
+      While(BoolLit(true), List(
+        Switch(IntLit(1), List(
+          TypedSwitchCaseBody(
+            List(TypedSwitchLabel.TypedCaseLabel(IntLit(1))),
+            List(Continue())
+          ),
+          TypedSwitchCaseBody(
+            List(TypedSwitchLabel.TypedDefaultLabel()),
+            List(Break())
+          )
+        )),
+        Break()
+      ))
+    ))
+
+    val body = got.body.toList
+    val markedLabels = body.collect { case TAC.Mark(label) => label }
+    val whileHead = markedLabels.head
+    val switchEnd = markedLabels.init.last
+    val whileEnd = markedLabels.last
+
+    assert(body.count(_ == TAC.Jmp(whileHead)) == 2)
+    assert(body.contains(TAC.Jmp(switchEnd)))
+    assert(body.contains(TAC.Jmp(whileEnd)))
   }
 
   test("LowerToTAC: switch evaluates its selector once") {

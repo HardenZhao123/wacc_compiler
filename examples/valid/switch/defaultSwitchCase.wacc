@@ -9,8 +9,8 @@
 begin
   int value = 99;
   switch (value)
-    case 1: println "first case"
-    case 2: println "second case"
+    case 1: println "first case"; Break
+    case 2: println "second case"; Break
     default: println "default selected"
   end
 end

@@ -67,9 +67,9 @@ object TypeCheckError {
         val msg = s"return is only allowed inside a function"
     }
 
-    // Raised when break is used outside a loop body
+    // Raised when break is used outside a loop or switch body
     final case class BreakOutsideLoop(pos: PositionInfo) extends TypeCheckError {
-        val msg = s"break is only allowed inside a loop"
+        val msg = s"break is only allowed inside a loop or switch"
     }
 
     // Raised when continue is used outside a loop body

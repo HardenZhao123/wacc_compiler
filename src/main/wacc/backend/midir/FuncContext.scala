@@ -26,13 +26,23 @@ final class FuncContext(val isMain: Boolean, val returnType: Option[SemanticType
   private val _instrs: mutable.Builder[Instr, List[Instr]] = List.newBuilder
   def instrs: List[Instr] = _instrs.result()
 
-  // Loop and exception stacks let nested constructs lower break/continue/throw without global state.
-  private val loopTargets: mutable.Stack[LoopTarget] = mutable.Stack.empty
+  // Break and continue use separate stacks because a switch is breakable but is not a loop.
+  private val breakTargets: mutable.Stack[Label] = mutable.Stack.empty
+  private val continueTargets: mutable.Stack[Label] = mutable.Stack.empty
   private val exceptionHandlers: mutable.Stack[Label] = mutable.Stack.empty
 
-  def pushLoop(target: LoopTarget): Unit = loopTargets.push(target)
-  def popLoop(): Unit = if (loopTargets.nonEmpty) loopTargets.pop()
-  def currentLoop: Option[LoopTarget] = loopTargets.headOption
+  def pushLoop(target: LoopTarget): Unit = {
+    breakTargets.push(target.breakLabel)
+    continueTargets.push(target.continueLabel)
+  }
+  def popLoop(): Unit = {
+    if (breakTargets.nonEmpty) breakTargets.pop()
+    if (continueTargets.nonEmpty) continueTargets.pop()
+  }
+  def pushBreakTarget(target: Label): Unit = breakTargets.push(target)
+  def popBreakTarget(): Unit = if (breakTargets.nonEmpty) breakTargets.pop()
+  def currentBreakTarget: Option[Label] = breakTargets.headOption
+  def currentContinueTarget: Option[Label] = continueTargets.headOption
 
   def pushExceptionHandler(label: Label): Unit = exceptionHandlers.push(label)
   def popExceptionHandler(): Unit = if (exceptionHandlers.nonEmpty) exceptionHandlers.pop()

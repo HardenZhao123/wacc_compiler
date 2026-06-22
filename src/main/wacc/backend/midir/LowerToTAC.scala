@@ -161,12 +161,12 @@ object LowerToTAC {
     case TypedStmt.DoWhile(body, cond) => lowerDoWhile(body, cond)
 
     case TypedStmt.Break() =>
-      val target = ftx.currentLoop.getOrElse(throw new Exception(ERR_BREAK_OUTSIDE_LOOP))
-      ftx.emit(Jmp(target.breakLabel))
+      val target = ftx.currentBreakTarget.getOrElse(throw new Exception(ERR_BREAK_OUTSIDE_LOOP))
+      ftx.emit(Jmp(target))
 
     case TypedStmt.Continue() =>
-      val target = ftx.currentLoop.getOrElse(throw new Exception(ERR_CONTINUE_OUTSIDE_LOOP))
-      ftx.emit(Jmp(target.continueLabel))
+      val target = ftx.currentContinueTarget.getOrElse(throw new Exception(ERR_CONTINUE_OUTSIDE_LOOP))
+      ftx.emit(Jmp(target))
 
     case TypedStmt.Print(expr) =>
       val rhs = lowerExpr(expr)
@@ -561,10 +561,16 @@ object LowerToTAC {
 
     ftx.emit(Jmp(defaultTarget.getOrElse(endLabel)))
 
-    cases.zip(caseLabels).foreach { (switchCase, target) =>
-      ftx.emit(Mark(target))
-      lowerStmts(switchCase.body)
-      ftx.emit(Jmp(endLabel))
+    ftx.pushBreakTarget(endLabel)
+    try {
+      // Bodies are deliberately contiguous: reaching the end of one case falls
+      // through into the next case, while an explicit Break jumps to endLabel.
+      cases.zip(caseLabels).foreach { (switchCase, target) =>
+        ftx.emit(Mark(target))
+        lowerStmts(switchCase.body)
+      }
+    } finally {
+      ftx.popBreakTarget()
     }
     ftx.emit(Mark(endLabel))
   }

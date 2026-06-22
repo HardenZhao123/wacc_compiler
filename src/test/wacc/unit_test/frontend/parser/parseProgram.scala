@@ -72,4 +72,52 @@ class ProgramParserTest extends AnyFlatSpec with ParserTestHelpers {
       case Failure(err)                          => fail(s"Parsing failed: $err")
     }
   }
+
+  it should "accept a returning switch case that falls through to a later return" in {
+    val src =
+      """
+        begin
+          int f(int x) is
+            switch (x)
+              case 1: skip
+              case 2: return 2
+              default: return 0
+            end
+          end
+          skip
+        end
+      """
+
+    p.parseProgram(src) match {
+      case Success(ast) =>
+        val nonReturnErrs = List.newBuilder[NonReturnErr]
+        ReturnCheck.checkProgram(ast, nonReturnErrs)
+        nonReturnErrs.result() shouldBe empty
+      case Failure(err) => fail(s"Parsing failed: $err")
+    }
+  }
+
+  it should "reject a switch case that breaks before the function returns" in {
+    val src =
+      """
+        begin
+          int f(int x) is
+            switch (x)
+              case 1: Break
+              case 2: return 2
+              default: return 0
+            end
+          end
+          skip
+        end
+      """
+
+    p.parseProgram(src) match {
+      case Success(ast) =>
+        val nonReturnErrs = List.newBuilder[NonReturnErr]
+        ReturnCheck.checkProgram(ast, nonReturnErrs)
+        nonReturnErrs.result() should not be empty
+      case Failure(err) => fail(s"Parsing failed: $err")
+    }
+  }
 }
