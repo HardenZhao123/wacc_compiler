@@ -247,6 +247,20 @@ class StmtParserTest extends AnyFlatSpec with ParserTestHelpers {
     }
   }
 
+  it should "parse side-effecting expressions as statements" in {
+    p.parseStmt("x += 1") match {
+      case Success(ExprStmt(AddEqual(LIdent(Identifier("x")), IntLiter(1)))) => succeed
+      case Success(other)                                                    => fail(s"Unexpected parse result: $other")
+      case Failure(err)                                                      => fail(s"Parsing failed: $err")
+    }
+
+    p.parseStmt("++fst p") match {
+      case Success(ExprStmt(Increment(LPairElem(PFst(LIdent(Identifier("p"))))))) => succeed
+      case Success(other)                                                         => fail(s"Unexpected parse result: $other")
+      case Failure(err)                                                           => fail(s"Parsing failed: $err")
+    }
+  }
+
   it should "parse read statement" in {
     p.parseStmt("read x") match {
       case Success(Read(LIdent(Identifier("x")))) => succeed

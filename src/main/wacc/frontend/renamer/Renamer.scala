@@ -108,6 +108,9 @@ object Renamer {
     case Println(e) =>
       Println(renameExpr(e, funcs))(s.positionInfo)
 
+    case ExprStmt(e) =>
+      ExprStmt(renameExpr(e, funcs))(s.positionInfo)
+
     case BeginEnd(body) =>
       BeginEnd(renameStmt(body, funcs)(using ctx.newScope, st))(s.positionInfo)
       
@@ -247,6 +250,17 @@ object Renamer {
     case Or(l, r) => Or(renameExpr(l, funcs), renameExpr(r, funcs))(e.positionInfo)
     case BitAnd(l, r) => BitAnd(renameExpr(l, funcs), renameExpr(r, funcs))(e.positionInfo)
     case BitOr(l, r) => BitOr(renameExpr(l, funcs), renameExpr(r, funcs))(e.positionInfo)
+    
+    // unary side-effecting expr
+    case Increment(op) => Increment(renameLValue(op, funcs))(e.positionInfo)
+    case Decrement(op) => Decrement(renameLValue(op, funcs))(e.positionInfo)
+    
+    // binary side-effecting expr 
+    case AddEqual(l, r) => AddEqual(renameLValue(l, funcs), renameExpr(r, funcs))(e.positionInfo)
+    case SubEqual(l, r) => SubEqual(renameLValue(l, funcs), renameExpr(r, funcs))(e.positionInfo)
+    case MulEqual(l, r) => MulEqual(renameLValue(l, funcs), renameExpr(r, funcs))(e.positionInfo)
+    case DivEqual(l, r) => DivEqual(renameLValue(l, funcs), renameExpr(r, funcs))(e.positionInfo)
+    case ModEqual(l, r) => ModEqual(renameLValue(l, funcs), renameExpr(r, funcs))(e.positionInfo)
   }
   
   // Helper function to rename WACCExceptions

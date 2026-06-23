@@ -6,6 +6,7 @@ import parsley.{Success, Failure}
 
 import wacc.frontend.parser
 import wacc.frontend.ast.Expr.*
+import wacc.frontend.ast.LValue.*
 
 class ExprParserTest extends AnyFlatSpec with ParserTestHelpers {
 
@@ -159,6 +160,32 @@ class ExprParserTest extends AnyFlatSpec with ParserTestHelpers {
       case Success(BitNot(IntLiter(1))) => succeed
       case Success(other)               => fail(s"Unexpected parse result: $other")
       case Failure(err)                 => fail(s"Parsing failed: $err")
+    }
+  }
+
+  it should "parse side-effecting expressions without breaking adjacent plus/minus arithmetic" in {
+    p.parseExpr("++x") match {
+      case Success(Increment(LIdent(Identifier("x")))) => succeed
+      case Success(other)                              => fail(s"Unexpected parse result: $other")
+      case Failure(err)                                => fail(s"Parsing failed: $err")
+    }
+
+    p.parseExpr("arr[0] += 2") match {
+      case Success(AddEqual(LArray(ArrayElem(Identifier("arr"), List(IntLiter(0)))), IntLiter(2))) => succeed
+      case Success(other)                                                                          => fail(s"Unexpected parse result: $other")
+      case Failure(err)                                                                            => fail(s"Parsing failed: $err")
+    }
+
+    p.parseExpr("1++2") match {
+      case Success(Add(IntLiter(1), IntLiter(2))) => succeed
+      case Success(other)                         => fail(s"Unexpected parse result: $other")
+      case Failure(err)                           => fail(s"Parsing failed: $err")
+    }
+
+    p.parseExpr("1--2") match {
+      case Success(Sub(IntLiter(1), IntLiter(-2))) => succeed
+      case Success(other)                          => fail(s"Unexpected parse result: $other")
+      case Failure(err)                            => fail(s"Parsing failed: $err")
     }
   }
 }

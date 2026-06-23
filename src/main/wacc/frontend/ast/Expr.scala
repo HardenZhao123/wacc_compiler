@@ -89,4 +89,31 @@ object Expr {
   object Or extends ParserBridgePos2[Expr, Expr, Or]
   object BitAnd extends ParserBridgePos2[Expr, Expr, BitAnd]
   object BitOr extends ParserBridgePos2[Expr, Expr, BitOr]
+
+  // Unary side-effecting expressions
+  sealed trait UnarySideEffecting extends Expr {
+    val operand: LValue
+  }
+  case class Increment(operand: LValue)(override val positionInfo: PositionInfo) extends UnarySideEffecting
+  case class Decrement(operand: LValue)(override val positionInfo: PositionInfo) extends UnarySideEffecting
+
+  object Increment extends ParserBridgePos1[LValue, Increment]
+  object Decrement extends ParserBridgePos1[LValue, Decrement]
+
+  // Binary side-effecting expressions
+  sealed trait BinarySideEffecting extends Expr {
+    val left: LValue
+    val right: Expr
+  }
+  case class AddEqual(left: LValue, right: Expr)(override val positionInfo: PositionInfo) extends BinarySideEffecting
+  case class SubEqual(left: LValue, right: Expr)(override val positionInfo: PositionInfo) extends BinarySideEffecting
+  case class MulEqual(left: LValue, right: Expr)(override val positionInfo: PositionInfo) extends BinarySideEffecting
+  case class DivEqual(left: LValue, right: Expr)(override val positionInfo: PositionInfo) extends BinarySideEffecting
+  case class ModEqual(left: LValue, right: Expr)(override val positionInfo: PositionInfo) extends BinarySideEffecting
+
+  object AddEqual extends ParserBridgePos2[LValue, Expr, AddEqual]
+  object SubEqual extends ParserBridgePos2[LValue, Expr, SubEqual]
+  object MulEqual extends ParserBridgePos2[LValue, Expr, MulEqual]
+  object DivEqual extends ParserBridgePos2[LValue, Expr, DivEqual]
+  object ModEqual extends ParserBridgePos2[LValue, Expr, ModEqual]
 }

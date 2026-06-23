@@ -150,6 +150,10 @@ object TypeCheckerStmt {
       val (_, typedExpr) = TypeCheckerExpr.checkExpr(expr, Constraint.UnConstraint)
       Some(TypedStmt.Println(typedExpr))
 
+    case ExprStmt(expr) =>
+      val (_, typedExpr) = TypeCheckerExpr.checkExpr(expr, Constraint.UnConstraint)
+      Some(TypedStmt.ExprStmt(typedExpr))
+
     // If statement  
     case If(cond, thn) => 
       val (_, condTypedExpr) = TypeCheckerExpr.checkExpr(cond, Constraint.Is(SemBool))

@@ -7,24 +7,43 @@ sealed abstract class TypedExpr(var ty: SemanticType)
 object TypedExpr {
   sealed trait BinaryOperation
 
-  /* Binary arithmetic operations: +, -, *, /, % */
-  enum ArithmeticOperation extends BinaryOperation {case Add, Sub, Mul, Div, Mod}
-  case class BinaryArithmetic(left: TypedExpr, right: TypedExpr, op: ArithmeticOperation)
-    extends TypedExpr(
-      op match {
-        case ArithmeticOperation.Mod =>
-          SemInt
-
-        case _ =>
-          (left.ty, right.ty) match {
-            case (SemInt, SemInt)       => SemInt
-            case (SemFloat, SemFloat)   => SemFloat
-            case (SemFloat, SemInt)     => SemFloat
-            case (SemInt, SemFloat)     => SemFloat
-            case _                      => SemUnknown
-          }
+  // Abstract or shared trait to hold the common type-checking logic
+  object BinaryTypeResolver {
+    def resolveArithmetic(leftTy: SemanticType, rightTy: SemanticType, isMod: Boolean): SemanticType = {
+      if (isMod) SemInt
+      else (leftTy, rightTy) match {
+        case (SemInt, SemInt) => SemInt
+        case (SemFloat, SemFloat) => SemFloat
+        case (SemFloat, SemInt) => SemFloat
+        case (SemInt, SemFloat) => SemFloat
+        case _ => SemUnknown
       }
-    )
+    }
+  }
+
+  object UnaryTypeResolver {
+    def resolveForIntFloat(operandTy: SemanticType): SemanticType = operandTy match {
+      case SemInt => SemInt
+      case SemFloat => SemFloat
+      case _ => SemUnknown
+    }
+  }
+
+  /* Binary arithmetic operations: +, -, *, /, % */
+  enum ArithmeticOperation extends BinaryOperation {
+    case Add, Sub, Mul, Div, Mod
+    def isMod: Boolean = this == Mod
+  }
+  case class BinaryArithmetic(left: TypedExpr, right: TypedExpr, op: ArithmeticOperation)
+    extends TypedExpr(BinaryTypeResolver.resolveArithmetic(left.ty, right.ty, op.isMod))
+
+  /* Binary side-effecting operations: +=, -=, *=, /=, %= */
+  enum BinarySideEffectingOperation extends BinaryOperation {
+    case AddEqual, SubEqual, MulEqual, DivEqual, ModEqual
+    def isMod: Boolean = this == ModEqual
+  }
+  case class BinarySideEffecting(left: TypedLValue, right: TypedExpr, op: BinarySideEffectingOperation)
+    extends TypedExpr(left.ty)
 
   /* Binary comparison operations: ==, !=, >, >=, <, <= */
   enum CompareOperation extends BinaryOperation {case Greater, GreaterEqual, Less, LessEqual, Equal, NotEqual}
@@ -43,17 +62,15 @@ object TypedExpr {
 
   /* Unary operations: !, -, len, ord, chr, ~ */
   case class Not(operand: TypedExpr) extends TypedExpr(SemBool)
-  case class Neg(operand: TypedExpr) extends TypedExpr(
-    operand.ty match {
-      case SemInt   => SemInt
-      case SemFloat => SemFloat
-      case _        => SemUnknown
-    }
-  )
+  case class Neg(operand: TypedExpr) extends TypedExpr(UnaryTypeResolver.resolveForIntFloat(operand.ty))
   case class Len(operand: TypedExpr) extends TypedExpr(SemInt)
   case class Ord(operand: TypedExpr) extends TypedExpr(SemInt)
   case class Chr(operand: TypedExpr) extends TypedExpr(SemChar)
   case class BitNot(operand: TypedExpr) extends TypedExpr(SemInt)
+
+  /* Unary side-effecting operations: ++, -- */
+  case class Increment(operand: TypedLValue) extends TypedExpr(UnaryTypeResolver.resolveForIntFloat(operand.ty))
+  case class Decrement(operand: TypedLValue) extends TypedExpr(UnaryTypeResolver.resolveForIntFloat(operand.ty))
 
   /* Literal expressions */
   case class IntLit(value: Int) extends TypedExpr(SemInt)
@@ -124,6 +141,7 @@ object TypedStmt {
   case class Exit(expr: TypedExpr) extends TypedStmt
   case class Print(expr: TypedExpr) extends TypedStmt
   case class Println(expr: TypedExpr) extends TypedStmt
+  case class ExprStmt(expr: TypedExpr) extends TypedStmt
   case class IfElse(cond: TypedExpr, thenBranch: List[TypedStmt], elseBranch: List[TypedStmt]) extends TypedStmt
   case class If(cond: TypedExpr, thenBranch: List[TypedStmt]) extends TypedStmt
   case class Switch(selector: TypedExpr, cases: List[TypedSwitchCaseBody]) extends TypedStmt

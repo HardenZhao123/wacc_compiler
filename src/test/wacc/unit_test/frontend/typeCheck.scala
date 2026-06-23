@@ -142,6 +142,42 @@ class TypeCheckerTest extends AnyFlatSpec {
     shouldExit(src, ExitCode.SemanticError)
   }
 
+  it should "accept side-effecting expressions for int and float lvalues" in {
+    val src =
+      """
+      begin
+        int x = 1;
+        int y = ++x;
+        x += 3;
+        float f = 1.0;
+        float g = f += 2
+      end
+      """
+    shouldExit(src, ExitCode.Success)
+  }
+
+  it should "reject side-effecting expressions that cannot write back to the lvalue type" in {
+    val src =
+      """
+      begin
+        int x = 1;
+        x += 1.5
+      end
+      """
+    shouldExit(src, ExitCode.SemanticError)
+  }
+
+  it should "reject increment and decrement on non-numeric lvalues" in {
+    val src =
+      """
+      begin
+        bool b = true;
+        ++b
+      end
+      """
+    shouldExit(src, ExitCode.SemanticError)
+  }
+
   it should "accept char comparisons" in {
     val src =
       """

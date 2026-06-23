@@ -1,7 +1,7 @@
 package wacc.frontend
 
 import parsley.{Parsley, Result}
-import parsley.expr.{InfixL, InfixN, InfixR, Prefix, SOps, precedence}
+import parsley.expr.{InfixL, InfixN, InfixR, SOps, precedence}
 import parsley.quick.{atomic, many, pure, some}
 import lexer.implicits.given
 import lexer.{boolean, char, float, fully, identifier, implicits, integer, string}
@@ -55,13 +55,21 @@ object parser {
     <|> pairAtom <|> atomic(arrayAtom) <|> identifierAtom
     <|> parensAtom
 
-    // Operator precedence table: each `Expr.X from "tok"` uses your bridge traits to attach PositionInfo to AST nodes.
-    private lazy val expr: Parsley[Expr] = precedence(atom)(
-        SOps(Prefix)(
-            Expr.Not from "!", Expr.Neg from "-", Expr.Len from "len",
-            Expr.Ord from "ord", Expr.Chr from "chr", Expr.BitNot from "~"
-        ),
+    private lazy val sideEffectPrefixP: Parsley[Expr] =
+        Expr.Increment(atomic("+" *> "+" *> lvalueP)) <|>
+          Expr.Decrement(atomic("-" *> "-" *> lvalueP))
 
+    private lazy val prefixExpr: Parsley[Expr] =
+        sideEffectPrefixP <|> atom
+      <|> Expr.Not("!" ~> prefixExpr)
+      <|> Expr.Neg("-" ~> prefixExpr)
+      <|> Expr.Len("len" ~> prefixExpr)
+      <|> Expr.Ord("ord" ~> prefixExpr)
+      <|> Expr.Chr("chr" ~> prefixExpr)
+      <|> Expr.BitNot("~" ~> prefixExpr)
+
+    // Operator precedence table: each `Expr.X from "tok"` uses your bridge traits to attach PositionInfo to AST nodes.
+    private lazy val nonAssignExpr: Parsley[Expr] = precedence(prefixExpr)(
         SOps(InfixL)(Expr.Mul from "*", Expr.Mod from "%", Expr.Div from "/"),
 
         SOps(InfixL)(Expr.Add from "+", Expr.Sub from "-"),
@@ -77,8 +85,32 @@ object parser {
         SOps(InfixL)(Expr.BitOr from "|"),
 
         SOps(InfixR)(Expr.And from "&&"),
-        SOps(InfixR)(Expr.Or  from "||"),
+        SOps(InfixR)(Expr.Or  from "||")
     )
+
+    private lazy val compoundAssignOp: Parsley[(LValue, Expr) => Expr] =
+        (Expr.AddEqual from "+=") <|>
+          (Expr.SubEqual from "-=") <|>
+          (Expr.MulEqual from "*=") <|>
+          (Expr.DivEqual from "/=") <|>
+          (Expr.ModEqual from "%=")
+
+    private lazy val sideEffectAssignP: Parsley[Expr] =
+        for {
+            leftAndMake <- atomic(
+                for {
+                    left <- lvalueP
+                    make <- compoundAssignOp
+                } yield (left, make)
+            )
+            right <- expr
+        } yield leftAndMake._2(leftAndMake._1, right)
+
+    private lazy val sideEffectExprP: Parsley[Expr] =
+        sideEffectAssignP <|> sideEffectPrefixP
+
+    private lazy val expr: Parsley[Expr] =
+        sideEffectAssignP <|> nonAssignExpr
 
     // Parser for WACC exception expressions.
     // Each branch parses a specific exception constructor with a message expression.
@@ -222,6 +254,8 @@ object parser {
 
     private lazy val printlnP: Parsley[Stmt] = Println("println" ~> expr)
 
+    private lazy val exprStmtP: Parsley[Stmt] = ExprStmt(sideEffectExprP)
+
     private lazy val beginP: Parsley[Stmt] = BeginEnd("begin" ~> stmtP <~ "end")
 
     // Parser for a catch handler in a try-catch construct.
@@ -306,7 +340,7 @@ object parser {
     // Statement atoms: preference order is important because many productions share prefixes.
     private lazy val stmtAtom: Parsley[Stmt] =
         skipP <|> atomic(ifElseP) <|> ifP <|> whileP <|> forP <|> beginP <|> tryCatchP
-      <|> doWhileP <|> breakP <|> continueP <|> declP <|> assignP <|> readP <|> freeP
+      <|> doWhileP <|> breakP <|> continueP <|> declP <|> atomic(assignP) <|> exprStmtP <|> readP <|> freeP
       <|> returnP <|> throwP <|> exitP <|> printP <|> printlnP <|> switchP
 
     // Sequencing: parse one-or-more statements separated by ';' and only wrap in SeqStmt when needed.
