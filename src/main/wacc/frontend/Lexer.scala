@@ -15,7 +15,7 @@ object lexer {
         "read", "free", "return", "throw", "exit", "print", "println",
         "if", "then", "else", "fi", "while", "do", "done",
         "newpair", "fst", "snd", "call", "len", "ord", "chr",
-        "try", "catch", "for", "Break", "Continue", "default",
+        "try", "catch", "for", "break", "continue", "default",
         "ArrayOutOfBoundsException", "BadCharException",
         "ArithmeticException", "IntegerOverflowException",
         "NullDereferenceException", "Exception"

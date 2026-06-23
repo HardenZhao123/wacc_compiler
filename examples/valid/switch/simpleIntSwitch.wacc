@@ -9,8 +9,8 @@
 begin
   int choice = 2;
   switch (choice)
-    case 1: println "one"; Break
-    case 2: println "two"; Break
+    case 1: println "one"; break
+    case 2: println "two"; break
     default: println "other"
   end
 end

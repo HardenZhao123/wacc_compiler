@@ -14,8 +14,8 @@ begin
 
   do
     i = i + 1 ;
-    if i == 2 then Continue else skip fi;
-    if i == 5 then Break else skip fi;
+    if i == 2 then continue else skip fi;
+    if i == 5 then break else skip fi;
     println i
   while i < 10 ;
 

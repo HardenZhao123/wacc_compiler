@@ -468,13 +468,13 @@ class StmtParserTest extends AnyFlatSpec with ParserTestHelpers {
 
 
   it should "parse break and continue statements" in {
-    p.parseStmt("Break") match {
+    p.parseStmt("break") match {
       case Success(Break()) => succeed
       case Success(other)   => fail(s"Unexpected parse result: $other")
       case Failure(err)     => fail(s"Parsing failed: $err")
     }
 
-    p.parseStmt("Continue") match {
+    p.parseStmt("continue") match {
       case Success(Continue()) => succeed
       case Success(other)      => fail(s"Unexpected parse result: $other")
       case Failure(err)        => fail(s"Parsing failed: $err")

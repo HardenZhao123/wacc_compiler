@@ -251,9 +251,9 @@ object parser {
     
     private lazy val doWhileP: Parsley[Stmt] = DoWhile("do" ~> stmtP, "while" ~> expr)
 
-    private lazy val breakP: Parsley[Stmt] = Break from "Break"
+    private lazy val breakP: Parsley[Stmt] = Break from "break"
 
-    private lazy val continueP: Parsley[Stmt] = Continue from "Continue"
+    private lazy val continueP: Parsley[Stmt] = Continue from "continue"
 
     private lazy val ifElseP: Parsley[Stmt] = IfElse("if" ~> expr, "then" ~> stmtP, "else" ~> stmtP <~ "fi")
 

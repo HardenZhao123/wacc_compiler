@@ -103,7 +103,7 @@ class ProgramParserTest extends AnyFlatSpec with ParserTestHelpers {
         begin
           int f(int x) is
             switch (x)
-              case 1: Break
+              case 1: break
               case 2: return 2
               default: return 0
             end
