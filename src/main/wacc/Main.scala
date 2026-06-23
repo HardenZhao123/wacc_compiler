@@ -6,7 +6,7 @@ import java.nio.file.Paths
 import java.io.FileOutputStream
 import scala.io.Source
 import wacc.common.*
-import wacc.frontend.parser
+import wacc.frontend.{MacroPreprocessor, parser}
 import wacc.frontend.renamer.{RenameError, Renamer}
 import wacc.frontend.returnCheck.{NonReturnErr, ReturnCheck}
 import wacc.frontend.typeCheck.TypeChecker
@@ -22,7 +22,7 @@ object Main {
 
     var semanticErr = false
 
-    val input =
+    val source =
       try Source.fromFile(path).mkString
       catch {
         case _: Exception =>
@@ -30,6 +30,25 @@ object Main {
           println(s"Finished with exit code: ${ExitCode.UsageError}")
           return ExitCode.UsageError
       }
+
+    println("Starting macro preprocessing...")
+    val input = MacroPreprocessor.preprocess(source) match {
+      case Left(error) =>
+        System.err.println(
+          s"""Errors detected during compilation!
+             |${"-" * 30}
+             |""".stripMargin
+        )
+        System.err.println(s"${error.format(path, source)}\n")
+        println(
+          s"""${"-" * 30}
+             |Finished with exit code: ${ExitCode.SyntaxError}""".stripMargin
+        )
+        return ExitCode.SyntaxError
+      case Right(expanded) =>
+        println("Macro preprocessing finished!")
+        expanded
+    }
 
     // 1. Parse
     println("Starting parsing... finished!")
