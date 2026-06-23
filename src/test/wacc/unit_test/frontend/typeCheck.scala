@@ -634,8 +634,8 @@ class TypeCheckerTest extends AnyFlatSpec {
         int i = 0;
         while i < 10 do
           i = i + 1;
-          if i == 3 then Continue else skip fi;
-          if i == 5 then Break else skip fi
+          if i == 3 then continue else skip fi;
+          if i == 5 then break else skip fi
         done
       end
       """
@@ -646,7 +646,7 @@ class TypeCheckerTest extends AnyFlatSpec {
     val src =
       """
       begin
-        Break
+        break
       end
       """
     shouldExit(src, ExitCode.SemanticError)
@@ -658,7 +658,7 @@ class TypeCheckerTest extends AnyFlatSpec {
       begin
         int value = 1;
         switch (value)
-          case 1: println "one"; Break
+          case 1: println "one"; break
           default: println "other"
         end
       end
@@ -672,7 +672,7 @@ class TypeCheckerTest extends AnyFlatSpec {
       begin
         int value = 1;
         switch (value)
-          case 1: Continue
+          case 1: continue
           default: skip
         end
       end
@@ -686,10 +686,10 @@ class TypeCheckerTest extends AnyFlatSpec {
       begin
         while true do
           switch (1)
-            case 1: Continue
-            default: Break
+            case 1: continue
+            default: break
           end;
-          Break
+          break
         done
       end
       """
@@ -770,7 +770,7 @@ class TypeCheckerTest extends AnyFlatSpec {
     val src =
       """
       begin
-        Continue
+        continue
       end
       """
     shouldExit(src, ExitCode.SemanticError)
