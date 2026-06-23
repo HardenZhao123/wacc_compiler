@@ -9,8 +9,8 @@
 begin
   int x = 2;
   switch (x + 1)
-    case 1: println "unexpected"; Break
-    case 3: println "expression matched"; Break
+    case 1: println "unexpected"; break
+    case 3: println "expression matched"; break
     default: println "no match"
   end
 end

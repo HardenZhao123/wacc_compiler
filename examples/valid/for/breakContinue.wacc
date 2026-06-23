@@ -11,8 +11,8 @@
 
 begin
   for (int i = 0, i < 10, i = i + 1)
-    if i == 6 then Break else skip fi;
-    if i % 2 == 0 then Continue else skip fi;
+    if i == 6 then break else skip fi;
+    if i % 2 == 0 then continue else skip fi;
     println i
   done;
 

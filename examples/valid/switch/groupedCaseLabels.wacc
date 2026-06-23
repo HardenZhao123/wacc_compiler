@@ -9,8 +9,8 @@
 begin
   char grade = 'B';
   switch (grade)
-    case 'A': case 'B': case 'C': println "passing grade"; Break
-    case 'D': println "resit required"; Break
+    case 'A': case 'B': case 'C': println "passing grade"; break
+    case 'D': println "resit required"; break
     default: println "unknown grade"
   end
 end

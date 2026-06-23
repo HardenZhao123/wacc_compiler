@@ -12,7 +12,7 @@ begin
   switch (value)
     case 1: println "one"
     case 2: println "two"
-    case 3: println "three"; Break
+    case 3: println "three"; break
     default: println "default"
   end
 end
