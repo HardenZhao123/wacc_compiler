@@ -1,145 +1,1011 @@
-# WACC Compiler Studio / WACC 编译器工作台
+# WACC Language Specification
 
-WACC Compiler Studio is a WACC compiler with a browser-based editor. It compiles WACC programs to AArch64 or ARM32 assembly, can apply peephole optimisation, and can run the generated program through the matching GNU cross-toolchain and QEMU emulator.
+This document specifies the WACC language accepted by this compiler. It is written in the style of a language reference: syntax is described with grammar productions, and semantic restrictions are stated as compile-time or run-time rules.
 
-WACC Compiler Studio 是一个带浏览器编辑器的 WACC 编译器。它可以将 WACC 程序编译为 AArch64 或 ARM32 汇编代码，可启用窥孔优化，并通过对应的 GNU 交叉工具链和 QEMU 模拟器运行生成的程序。
+The specification is based on the current implementation in `src/main/wacc/frontend` and the valid programs in `examples/valid`. In addition to the core WACC language, this compiler supports `float`, bitwise operators, `for`, `do-while`, `switch`, exceptions, simple macros, and function overloading.
 
-The browser is only the client: compilation, linking, and execution all happen on the server. A modern browser is therefore sufficient on Windows, macOS, Linux, phones, and tablets.
+## 1. Notation
 
-浏览器只负责客户端界面；编译、链接和执行都在服务器上完成。因此 Windows、macOS、Linux、手机和平板设备只需使用现代浏览器即可访问。
+Grammar productions use the following conventions:
 
-## Features / 功能
-
-- Compile WACC source to **AArch64** or **ARM32** assembly. / 将 WACC 源代码编译为 **AArch64** 或 **ARM32** 汇编。
-- Enable or disable peephole optimisation. / 启用或关闭窥孔优化。
-- Run generated assembly with a GNU cross-compiler and QEMU. / 使用 GNU 交叉编译器和 QEMU 运行生成的汇编程序。
-- Provide ready-to-use examples, health endpoints, bounded job queues, rate limiting, and security headers. / 提供示例程序、健康检查端点、受限任务队列、限流和安全响应头。
-- Deploy as a Docker service on Render. / 支持以 Docker 服务部署到 Render。
-
-## Project layout / 项目结构
-
-| Path / 路径 | Purpose / 作用 |
-| --- | --- |
-| `src/main/wacc` | Scala compiler: frontend, intermediate representation, and AArch64/ARM32 backends. / Scala 编译器：前端、中间表示和 AArch64/ARM32 后端。 |
-| `src/test/wacc` | Scala unit and integration tests. / Scala 单元测试与集成测试。 |
-| `examples` | Valid and invalid WACC example programs. / 合法和非法的 WACC 示例程序。 |
-| `web` | Node.js HTTP server, browser editor, and web-server tests. / Node.js HTTP 服务、浏览器编辑器和 Web 服务测试。 |
-| `Dockerfile`, `docker-compose.yml` | Reproducible full runtime with the compiler, cross-toolchains, and QEMU. / 包含编译器、交叉工具链和 QEMU 的可复现完整运行环境。 |
-| `render.yaml` | Render Blueprint configuration. / Render Blueprint 配置。 |
-
-## Local development / 本地开发
-
-### Requirements / 前置条件
-
-- Node.js 18 or later / Node.js 18 或更高版本
-- Either a built `./wacc-compiler` executable or Scala CLI/Scala available on `PATH` / 已构建的 `./wacc-compiler` 可执行文件，或 `PATH` 中可用的 Scala CLI/Scala
-
-Start the browser application:
-
-启动浏览器应用：
-
-```bash
-npm start
+```text
+X ::= Y          X is defined as Y
+X?              zero or one X
+X*              zero or more X
+X+              one or more X
+"token"         the literal token token
 ```
 
-Then open [http://127.0.0.1:3000](http://127.0.0.1:3000). The server first uses `WACC_COMPILER` when set, then `./wacc-compiler`, and otherwise falls back to `scala run`.
+WACC uses semicolons as separators between statements. A trailing semicolon before `end`, `fi`, `done`, `else`, or a new `case` label is not an empty statement and is not part of the normal grammar.
 
-然后打开 [http://127.0.0.1:3000](http://127.0.0.1:3000)。服务会优先使用 `WACC_COMPILER` 指定的程序，其次使用 `./wacc-compiler`，否则回退到 `scala run`。
+## 2. Lexical Structure
 
-To build the native compiler used by the web server:
+### 2.1 Whitespace and Comments
 
-构建 Web 服务使用的本地编译器：
+Whitespace separates tokens and is otherwise ignored.
+
+A line comment starts with `#` and continues to the end of the line. Comments are not recognised inside character or string literals.
+
+Example:
+
+```wacc
+begin
+  int x = 1 # comment after a statement
+end
+```
+
+### 2.2 Keywords
+
+The following words are reserved and cannot be used as identifiers:
+
+```text
+int char float string bool pair null
+true false begin end is skip switch case default
+read free return throw exit print println
+if then else fi while do done for
+newpair fst snd call len ord chr
+try catch Break Continue
+ArrayOutOfBoundsException BadCharException ArithmeticException
+IntegerOverflowException NullDereferenceException Exception
+```
+
+`Break` and `Continue` are capitalised keywords. Lowercase `break` and `continue` are not statement keywords in this compiler.
+
+### 2.3 Operators and Separators
+
+The following operator and separator tokens are recognised:
+
+```text
+! - * / % +
+> >= < <=
+== != && ||
+= ; , ( ) [ ]
+& | ~
+```
+
+### 2.4 Identifiers
+
+An identifier starts with a letter or `_`, followed by zero or more letters, digits, or `_`.
+
+```text
+Identifier ::= LetterOrUnderscore (LetterOrDigitOrUnderscore)*
+```
+
+Identifiers are case-sensitive.
+
+Valid examples:
+
+```wacc
+int x = 0;
+int _tmp = 1;
+int long_variable_name_123 = 2
+```
+
+### 2.5 Literals
+
+Integer literals are signed 32-bit decimal values. Decimal literals with leading zeroes are accepted. Binary, octal, and hexadecimal integer forms are not accepted.
+
+```wacc
+int x = 00042
+```
+
+Boolean literals are:
+
+```text
+true
+false
+```
+
+Character and string literals are ASCII only. The printable graphic characters are accepted except unescaped `\`, `"`, and `'`.
+
+Supported escape sequences are:
+
+```text
+\0 \b \t \n \f \r \\ \" \'
+```
+
+Float literals are accepted as single-precision `float` values.
+
+```wacc
+float x = 2.25
+```
+
+The null pair literal is:
+
+```text
+null
+```
+
+### 2.6 Macro Preprocessing
+
+Before parsing, the compiler applies a simple line-oriented macro preprocessor.
+
+```text
+MacroDefinition ::= "@define" Identifier ReplacementText
+```
+
+Rules:
+
+- A macro definition may be indented.
+- Macro names follow the normal identifier character rules.
+- Function-like macros are not supported.
+- A macro name may not be defined more than once.
+- Macro expansion is textual and applies outside strings, character literals, and comments.
+- Macro expansion is recursive, but recursive cycles are rejected.
+- A macro definition affects later source text; it does not emit a WACC statement.
+
+Example:
+
+```wacc
+@define LIMIT 10
+
+begin
+  int x = LIMIT
+end
+```
+
+## 3. Programs and Functions
+
+### 3.1 Program Form
+
+Every program has one outer `begin ... end` block.
+
+```text
+Program ::= "begin" FunctionDeclaration* Statement "end"
+```
+
+Function declarations, if present, must appear before the main statement body. Nested function declarations are not part of the grammar.
+
+The compiler accepts any input file path; `.wacc` is the conventional extension used by most examples.
+
+### 3.2 Function Declarations
+
+```text
+FunctionDeclaration ::=
+    Type Identifier "(" ParameterList? ")" "is" Statement "end"
+
+ParameterList ::= Parameter ("," Parameter)*
+Parameter     ::= Type Identifier
+```
+
+Examples:
+
+```wacc
+int f() is
+  return 0
+end
+
+int add(int x, int y) is
+  return x + y
+end
+```
+
+A function body must be statically returning. A compile-time syntax error occurs if a function can fall off the end without reaching a `return`, `throw`, or `exit`.
+
+The return checker treats these constructs as returning:
+
+- `return e`
+- `throw E(e)`
+- `exit e`
+- `if e then s1 else s2 fi`, only if both branches return
+- `switch`, only if it has a `default` and every possible case entry returns, accounting for fall-through and `Break`
+- `try ... catch ... done`, only if the try body and every catch body return
+- `begin s end`, if `s` returns
+- a statement sequence, if its last reachable statement returns
+
+Loops are not treated as statically returning by themselves, even if their condition is syntactically `true`.
+
+## 4. Types
+
+### 4.1 Type Grammar
+
+```text
+Type         ::= (BaseType | PairType) ArraySuffix*
+BaseType     ::= "int" | "bool" | "char" | "float" | "string"
+ArraySuffix  ::= "[]"
+
+PairType     ::= "pair" "(" PairElemType "," PairElemType ")"
+PairElemType ::= BaseType
+               | PairType
+               | (BaseType | PairType) ArraySuffix+
+               | "pair"
+```
+
+The standalone erased type `pair` is allowed only as a pair element type. A top-level variable, parameter, or return type must use a concrete `pair(T, U)` if it is a pair.
+
+Valid examples:
+
+```wacc
+int x = 1;
+bool b = true;
+char c = 'A';
+float f = 1.5;
+string s = "hello";
+int[] xs = [1, 2, 3];
+int[] row1 = [1];
+int[] row2 = [2];
+int[][] matrix = [row1, row2];
+pair(int, char) p = newpair(1, 'a');
+pair(int, pair) node = newpair(1, null)
+```
+
+### 4.2 Primitive Types
+
+`int` is a signed 32-bit integer type.
+
+`bool` contains `true` and `false`.
+
+`char` contains ASCII character values.
+
+`float` is a single-precision floating-point type.
+
+`string` is a primitive source type represented at run time like a character array pointer.
+
+### 4.3 Array Types
+
+An array type is written by appending one or more `[]` suffixes to a base or pair type.
+
+```wacc
+int[] a = [1, 2, 3];
+int[] b = [4, 5];
+int[][] nested = [a, b]
+```
+
+Array literals are heap values. The compiler infers array literal element types from the declaration, assignment target, or expected context.
+
+The empty array literal `[]` is accepted when its expected type can be inferred:
+
+```wacc
+int[] xs = [];
+xs = [1]
+```
+
+### 4.4 Strings and Character Arrays
+
+A `char[]` value is compatible with `string`.
+
+```wacc
+string s = ['h', 'i'];
+char[] chars = ['o', 'k'];
+string[] values = [chars, "box"]
+```
+
+A `char[]` can be printed as a string and can be indexed and updated as an array:
+
+```wacc
+char[] text = ['h', 'i'];
+text[0] = 'H';
+println text
+```
+
+A source-level `string` value is not indexable by this compiler. Indexing syntax is array-element syntax and is rejected semantically for `string`.
+
+### 4.5 Pair Types
+
+Pairs are constructed with `newpair(e1, e2)` and accessed with `fst` and `snd`.
+
+```wacc
+pair(int, bool) p = newpair(10, true);
+int x = fst p;
+bool y = snd p
+```
+
+Pair element types may use the erased `pair` type. This supports nested structures such as linked lists:
+
+```wacc
+pair(int, pair) node = newpair(1, null)
+```
+
+The literal `null` has erased pair type. It is compatible with concrete pair types where context supplies the missing type.
+
+### 4.6 Exception Types
+
+Exception type names are used in `catch` clauses. They are not parsed as ordinary variable, parameter, or return types.
+
+Supported exception type names are:
+
+```text
+ArithmeticException
+BadCharException
+ArrayOutOfBoundsException
+IntegerOverflowException
+NullDereferenceException
+Exception
+```
+
+## 5. Expressions
+
+### 5.1 Expression Grammar
+
+```text
+Expression ::= PrefixOperator Expression
+             | Expression BinaryOperator Expression
+             | Atom
+
+PrefixOperator ::= "!" | "-" | "len" | "ord" | "chr" | "~"
+
+Atom ::= IntegerLiteral
+       | BooleanLiteral
+       | CharacterLiteral
+       | FloatLiteral
+       | StringLiteral
+       | "null"
+       | Identifier
+       | ArrayElement
+       | "(" Expression ")"
+
+ArrayElement ::= Identifier ("[" Expression "]")+
+```
+
+Function calls, pair creation, pair-element r-values, and array literals are r-values, not general expressions. For example, `call f()` is valid on the right-hand side of a declaration or assignment, but it is not parsed as a nested expression operand.
+
+### 5.2 Operator Precedence and Associativity
+
+Operators are listed from highest precedence to lowest precedence.
+
+| Level | Operators | Associativity | Operand rule | Result |
+| ---: | --- | --- | --- | --- |
+| 1 | `!`, `-`, `len`, `ord`, `chr`, `~` | prefix | see unary rules | see unary rules |
+| 2 | `*`, `/`, `%` | left | numeric, but `%` requires `int` | numeric or `int` |
+| 3 | `+`, `-` | left | `int` or `float` | `int` or `float` |
+| 4 | `>`, `>=`, `<`, `<=` | non-associative | same ordered type: `int`, `char`, or `float` | `bool` |
+| 5 | `==`, `!=` | non-associative | compatible types | `bool` |
+| 6 | `&` | left | `int` | `int` |
+| 7 | `|` | left | `int` | `int` |
+| 8 | `&&` | right | `bool` | `bool` |
+| 9 | `||` | right | `bool` | `bool` |
+
+### 5.3 Unary Operators
+
+```text
+!e       e must be bool; result is bool
+-e       e must be int or float; result has the same numeric family
+len e    e must be an array; result is int
+ord e    e must be char; result is int
+chr e    e must be int; result is char
+~e       e must be int; result is int
+```
+
+`chr` performs a run-time ASCII range check. A run-time error or catchable `BadCharException` occurs if the integer is outside `0..127`.
+
+### 5.4 Arithmetic Operators
+
+`+`, `-`, `*`, and `/` accept `int` and `float` operands. If either operand is `float`, integer operands are converted to `float` and the result is `float`.
+
+`%` accepts only `int` operands.
+
+Integer division and modulo by zero are checked at run time.
+
+### 5.5 Boolean Operators
+
+`&&` and `||` require `bool` operands and use short-circuit evaluation.
+
+### 5.6 Bitwise Operators
+
+`&`, `|`, and `~` require `int` operands and produce `int`.
+
+### 5.7 Comparison Operators
+
+`>`, `>=`, `<`, and `<=` require both operands to have the same ordered type. The ordered types are `int`, `char`, and `float`.
+
+`==` and `!=` require the operands to have a common compatible type. Pairs, arrays, strings, primitive values, and `null` may be compared when the compatibility rules allow it.
+
+### 5.8 Array Element Expressions
+
+An array element expression has one or more indices:
+
+```wacc
+a[0]
+matrix[i][j]
+```
+
+Each index expression must have type `int`.
+
+The base identifier must have an array type. If too many indices are supplied, a compile-time type error occurs.
+
+At run time, array access checks:
+
+- the base pointer is not null,
+- each index is at least `0`,
+- each index is less than the array length.
+
+## 6. L-values and R-values
+
+### 6.1 L-values
+
+```text
+LValue ::= Identifier
+         | ArrayElement
+         | PairElement
+
+PairElement ::= "fst" LValue
+              | "snd" LValue
+```
+
+L-values are assignable storage locations.
+
+Examples:
+
+```wacc
+x = 1;
+a[0] = 2;
+fst p = 3;
+snd a[1] = 'x';
+fst snd nested = 7
+```
+
+### 6.2 R-values
+
+```text
+RValue ::= Expression
+         | ArrayLiteral
+         | NewPair
+         | PairElement
+         | FunctionCall
+
+ArrayLiteral ::= "[" ExpressionList? "]"
+ExpressionList ::= Expression ("," Expression)*
+
+NewPair ::= "newpair" "(" Expression "," Expression ")"
+
+FunctionCall ::= "call" Identifier "(" ArgumentList? ")"
+ArgumentList ::= Expression ("," Expression)*
+```
+
+R-values appear on the right-hand side of declarations and assignments.
+
+Examples:
+
+```wacc
+int x = 1 + 2;
+int[] xs = [1, 2, 3];
+pair(int, char) p = newpair(10, 'a');
+int first = fst p;
+int y = call f(1, 2)
+```
+
+## 7. Statements
+
+### 7.1 Statement Grammar
+
+```text
+Statement ::= StatementAtom (";" StatementAtom)*
+
+StatementAtom ::= "skip"
+                | Type Identifier "=" RValue
+                | LValue "=" RValue
+                | "read" LValue
+                | "free" Expression
+                | "return" Expression
+                | "throw" ExceptionConstructor
+                | "exit" Expression
+                | "print" Expression
+                | "println" Expression
+                | "begin" Statement "end"
+                | IfStatement
+                | WhileStatement
+                | ForStatement
+                | DoWhileStatement
+                | SwitchStatement
+                | TryCatchStatement
+                | "Break"
+                | "Continue"
+```
+
+### 7.2 Declaration Statements
+
+```text
+Declaration ::= Type Identifier "=" RValue
+```
+
+A compile-time error occurs if the right-hand side is not compatible with the declared type.
+
+The declared variable is not in scope inside its own initializer.
+
+```wacc
+int x = 1
+```
+
+### 7.3 Assignment Statements
+
+```text
+Assignment ::= LValue "=" RValue
+```
+
+A compile-time error occurs if the right-hand side is not compatible with the left-hand side type.
+
+Pair-element assignments whose element types are completely unknown are rejected unless the type of at least one side is known or specified.
+
+### 7.4 Read Statements
+
+```text
+ReadStatement ::= "read" LValue
+```
+
+The target l-value must have type `int`, `char`, or `float`.
+
+The run-time helper preserves the previous value if input cannot be read, including EOF.
+
+### 7.5 Free Statements
+
+```text
+FreeStatement ::= "free" Expression
+```
+
+The expression must have array or pair type. The valid examples use direct array or pair variables.
+
+Freeing a null pair is a run-time error. Array freeing is lowered through the array free helper.
+
+### 7.6 Return Statements
+
+```text
+ReturnStatement ::= "return" Expression
+```
+
+`return` is legal only inside a function. A compile-time semantic error occurs if `return` appears in the main program.
+
+The returned expression must be compatible with the function's declared return type.
+
+### 7.7 Throw Statements
+
+```text
+ThrowStatement ::= "throw" ExceptionConstructor
+
+ExceptionConstructor ::= "ArrayOutOfBoundsException" "(" Expression ")"
+                       | "ArithmeticException" "(" Expression ")"
+                       | "IntegerOverflowException" "(" Expression ")"
+                       | "NullDereferenceException" "(" Expression ")"
+                       | "BadCharException" "(" Expression ")"
+                       | "Exception" "(" Expression ")"
+```
+
+The constructor argument must have type `string`.
+
+### 7.8 Exit Statements
+
+```text
+ExitStatement ::= "exit" Expression
+```
+
+The expression must have type `int`.
+
+### 7.9 Print Statements
+
+```text
+PrintStatement   ::= "print" Expression
+PrintlnStatement ::= "println" Expression
+```
+
+`print` emits the expression without a newline. `println` emits the expression followed by a newline.
+
+Printing rules:
+
+- `int`, `bool`, `char`, `float`, and `string` values print as values.
+- `char[]` prints as a string.
+- non-character arrays and pairs print as pointers.
+- `bool` prints as `true` or `false`.
+
+### 7.10 Blocks
+
+```text
+Block ::= "begin" Statement "end"
+```
+
+A block introduces a nested variable scope.
+
+### 7.11 If Statements
+
+```text
+IfStatement ::= "if" Expression "then" Statement "fi"
+              | "if" Expression "then" Statement "else" Statement "fi"
+```
+
+The condition must have type `bool`.
+
+The `then` branch and `else` branch, if present, are nested scopes.
+
+### 7.12 While Statements
+
+```text
+WhileStatement ::= "while" Expression "do" Statement "done"
+```
+
+The condition must have type `bool`.
+
+The body is a nested scope. `Break` and `Continue` are valid inside the body. `Continue` jumps to the condition check.
+
+### 7.13 For Statements
+
+```text
+ForStatement ::= "for (" Statement "," Expression "," Statement ")" Statement "done"
+```
+
+The middle expression must have type `bool`.
+
+The initializer, condition, update statement, and body share the same loop scope. Variables declared by the initializer are visible in the condition, update statement, and body, but not after the loop.
+
+`Break` exits the loop. `Continue` jumps to the update statement before rechecking the condition.
+
+Example:
+
+```wacc
+for (int i = 0, i < 10, i = i + 1)
+  println i
+done
+```
+
+### 7.14 Do-while Statements
+
+```text
+DoWhileStatement ::= "do" Statement "while" Expression
+```
+
+The body executes before the condition is checked. The condition must have type `bool`.
+
+The body is a nested scope. `Continue` jumps to the trailing condition check.
+
+### 7.15 Break and Continue
+
+```text
+BreakStatement    ::= "Break"
+ContinueStatement ::= "Continue"
+```
+
+`Break` is valid inside loops and `switch` statements.
+
+`Continue` is valid only inside loops.
+
+### 7.16 Switch Statements
+
+```text
+SwitchStatement ::= "switch (" Expression ")" SwitchCase* "end"
+
+SwitchCase ::= SwitchLabel+ Statement*
+SwitchLabel ::= "case" Expression ":"
+              | "default" ":"
+```
+
+The selector may be any expression. Each `case` expression must be compatible with the selector type.
+
+The compiler supports `int`, `char`, `bool`, `float`, string-compatible, pair-compatible, and array-compatible case expressions where normal expression and compatibility rules allow them. The valid examples include `int`, `char`, `float`, expression selectors, grouped case labels, and `default`.
+
+Several labels may share the same body:
+
+```wacc
+switch (grade)
+  case 'A': case 'B': case 'C':
+    println "passing";
+    Break
+  default:
+    println "unknown"
+end
+```
+
+Execution starts at the first matching label. If no case label matches, execution starts at the first `default` label, if one exists. If no label matches and there is no `default`, the switch does nothing.
+
+Case bodies are contiguous. Reaching the end of a case body falls through to the next case body. Use `Break` to leave the switch.
+
+### 7.17 Try-catch Statements
+
+```text
+TryCatchStatement ::= "try" Statement CatchHandler+ "done"
+
+CatchHandler ::= "catch" ExceptionType Identifier "do" Statement
+
+ExceptionType ::= "ArithmeticException"
+                | "BadCharException"
+                | "ArrayOutOfBoundsException"
+                | "IntegerOverflowException"
+                | "NullDereferenceException"
+                | "Exception"
+```
+
+The try body is a nested scope. Each catch handler has its own nested scope.
+
+The catch variable is bound as a `string` containing the exception message.
+
+Handlers are tested in source order. A handler matches when its exception type has the same run-time exception id as the thrown exception.
+
+Important: `catch Exception` matches `throw Exception(...)`. It is not a catch-all for every exception type.
+
+## 8. Names, Declarations, and Scopes
+
+### 8.1 Variable Declarations
+
+A compile-time error occurs if a variable is redeclared in the same scope.
+
+Inner scopes may shadow outer variables.
+
+```wacc
+int x = 1;
+begin
+  bool x = true;
+  println x
+end;
+println x
+```
+
+### 8.2 Scope Boundaries
+
+These constructs introduce nested variable scopes:
+
+- `begin ... end` blocks,
+- `if` branches,
+- `else` branches,
+- `while` bodies,
+- `do-while` bodies,
+- `try` bodies,
+- each `catch` handler,
+- function bodies.
+
+`for` creates one loop scope shared by the initializer, condition, update, and body.
+
+`switch` does not create a separate nested variable scope in the renamer implementation. Case bodies are processed in source order in the surrounding scope.
+
+### 8.3 Function Names
+
+Function names live in a separate namespace from variables.
+
+Therefore these are valid:
+
+```wacc
+int f(int f) is
+  return f
+end
+
+int f = call f(99)
+```
+
+Function names may also coincide with libc symbol names such as `malloc`, `scanf`, `printf`, or `puts`; overloaded functions are name-mangled by the backend.
+
+### 8.4 Parameters
+
+Function parameters are declared in the function parameter scope. A compile-time error occurs if two parameters in the same parameter list have the same name.
+
+The function body is a nested scope under the parameter scope, so the body may shadow a parameter:
+
+```wacc
+bool f(int x) is
+  bool x = true;
+  return x
+end
+```
+
+## 9. Type Compatibility
+
+### 9.1 General Compatibility
+
+Two values are compatible if:
+
+- their semantic types are identical,
+- one type can be weakened to the other by a rule below,
+- or an unknown type is being resolved by context during type inference.
+
+A compile-time type error occurs when no compatibility rule applies.
+
+### 9.2 Weakening Rules
+
+The compiler implements these weakening rules:
+
+```text
+char[]              -> string
+pair(T, U)          -> pair
+pair                -> pair(T, U)
+```
+
+The last two rules describe compatibility between concrete pair types and the erased pair type. They are what make `null` and nested erased pair components useful.
+
+### 9.3 Arrays
+
+Array compatibility is based on element compatibility and the expected dimensional context.
+
+For declarations of array literals, the declared array dimensions and element type must match the inferred literal type.
+
+For indexing, each supplied index removes one array dimension. If the number of indices equals the array dimension count, the result is the element type. If fewer indices are supplied, the result is a lower-dimensional array.
+
+### 9.4 Pairs
+
+Concrete pair types are compatible when both components are compatible.
+
+Nested concrete pairs are erased when they occur as pair element display types, following the usual WACC pair-erasure model.
+
+The erased type `pair` does not carry component information. If an assignment attempts to exchange pair elements and both sides remain completely unknown, the compiler reports a type inference error.
+
+### 9.5 Exceptions
+
+Exception values are not ordinary expression values. Exception type names appear only in `catch` clauses, and exception constructors appear only in `throw` statements.
+
+## 10. Functions and Overloading
+
+### 10.1 Declaration Collection
+
+The compiler builds the complete function table before type-checking function bodies. This permits:
+
+- calls to functions declared later in the source file,
+- direct recursion,
+- mutual recursion.
+
+### 10.2 Overload Signatures
+
+Functions may share a name if their parameter type lists differ.
+
+```wacc
+int tag(int x) is return x end
+int tag(bool x) is return 0 end
+int tag(char[] xs) is return len xs end
+```
+
+A compile-time error occurs if two functions have the same name and the same parameter type list.
+
+The return type is not part of overload selection.
+
+### 10.3 Call Resolution
+
+```text
+FunctionCall ::= "call" Identifier "(" ArgumentList? ")"
+```
+
+A call is resolved as follows:
+
+1. Select overloads with the same name.
+2. Reject the call if no such function exists.
+3. Select overloads with the same arity as the call.
+4. Reject the call if no overload has that arity.
+5. Keep overloads whose parameter types are compatible with the argument types.
+6. Rank matches by more exact matches and fewer weakening conversions.
+7. Reject the call if several best-ranked overloads remain.
+8. Recheck arguments against the selected parameter types.
+
+Examples covered by the valid programs:
+
+- overloading by arity,
+- overloading by primitive parameter type,
+- overloading by parameter order,
+- overloading by array element type,
+- overloading by pair type,
+- exact `char[]` match preferred over weakening to `string`.
+
+## 11. Exceptions and Run-time Errors
+
+### 11.1 Explicit Exceptions
+
+An explicit `throw` allocates an exception object containing:
+
+- an exception id,
+- a message string.
+
+If there is an active `try-catch`, control transfers to the innermost active catch dispatcher. If no handler catches the exception in main code, the program reports:
+
+```text
+fatal error: <message>
+```
+
+and exits with the run-time error exit code.
+
+### 11.2 Implicit Run-time Exceptions
+
+The compiler also synthesizes exceptions for checked run-time failures:
+
+| Failure | Exception id/type | Message |
+| --- | --- | --- |
+| division or modulo by zero | `ArithmeticException` | `divide or modulo by zero` |
+| `chr` outside ASCII range `0..127` | `BadCharException` | `int is not ascii character 0-127` |
+| array index out of bounds | `ArrayOutOfBoundsException` | `array index out of bounds` |
+| integer overflow or underflow | `IntegerOverflowException` | `integer overflow or underflow occurred` |
+| null or freed pair dereference | `NullDereferenceException` | `null dereference or freed pair` |
+
+Inside an active `try-catch`, these implicit exceptions can be caught by a matching handler. Outside a handler context, they are reported as fatal run-time errors.
+
+### 11.3 Handler Matching
+
+Handlers are exact-match handlers over the implementation's exception ids.
+
+```wacc
+try
+  int x = 10 / 0
+catch ArithmeticException err do
+  println err
+done
+```
+
+`catch Exception` catches only a `GeneralException` produced by `throw Exception(...)`; it does not catch `ArithmeticException`, `BadCharException`, or the other specific exception types.
+
+### 11.4 Propagation Through Function Calls
+
+Function calls communicate exceptional completion through the compiler's global exception slot. After a call returns, the caller checks whether an exception was raised and either dispatches to its active handler or reports/propagates the exception.
+
+This allows exceptions thrown inside a function call to be caught by a surrounding try-catch in the caller.
+
+## 12. Input and Output
+
+### 12.1 Reading
+
+`read` supports:
+
+- `int`,
+- `char`,
+- `float`.
+
+Reading into pair elements and array elements is valid when the selected l-value has one of those types.
+
+If `scanf` cannot read a value, the previous value of the target is preserved.
+
+### 12.2 Printing
+
+The compiler provides print helpers for:
+
+- integers,
+- booleans,
+- characters,
+- floats,
+- strings and `char[]`,
+- pointers for arrays and pairs.
+
+`println e` is equivalent to `print e` followed by a newline.
+
+## 13. Implementation-defined Behaviour
+
+This section records behaviour that follows from this compiler implementation.
+
+- `call`, `newpair`, array literals, and pair-element r-values are not general expressions; they are r-values used in declarations and assignments.
+- `free` is parsed as accepting an expression and type-checked for array or pair type, but the valid examples and backend lowering use direct array or pair variables.
+- `switch` bodies fall through like C/Java switch bodies; `Break` is required to stop fall-through.
+- `switch` does not introduce a new variable scope.
+- `do-while` has no closing `done`.
+- `for` uses `Continue` to jump to the update statement.
+- `do-while` uses `Continue` to jump to the trailing condition check.
+- Function overloads are lowered by name mangling, so source-level function names can overlap with C library names.
+
+## 14. Minimal Complete Example
+
+```wacc
+begin
+  int max(int x, int y) is
+    if x > y then
+      return x
+    else
+      return y
+    fi
+  end
+
+  int[] values = [3, 7, 4];
+  int best = call max(values[0], values[1]);
+
+  switch (best)
+    case 7:
+      println "ok";
+      Break
+    default:
+      println "unexpected"
+  end
+end
+```
+
+## 15. Compiler Usage
+
+Build the compiler:
 
 ```bash
 make
 ```
 
-Run the web-server tests:
-
-运行 Web 服务测试：
+Compile a WACC program:
 
 ```bash
-npm run test:web
+./compile path/to/program.wacc
 ```
 
-Run the Scala compiler test suite:
-
-运行 Scala 编译器测试套件：
+Options:
 
 ```bash
-scala-cli test . --server=false --jvm system
+./compile path/to/program.wacc --architecture arm32
+./compile path/to/program.wacc --architecture aarch64
+./compile path/to/program.wacc --peephole-optim
+./compile path/to/program.wacc --no-peephole
 ```
 
-## Running generated programs / 运行生成的程序
+Defaults:
 
-Compiling assembly works without an ARM runtime. Running generated code requires the following cross-toolchain and emulator for the selected target.
-
-仅生成汇编代码时不需要 ARM 运行环境。运行生成的代码则需要目标架构对应的交叉工具链和模拟器。
-
-| Target / 目标 | Assembler and linker / 汇编器与链接器 | Emulator / 模拟器 | Default sysroot / 默认 sysroot |
-| --- | --- | --- | --- |
-| AArch64 | `aarch64-linux-gnu-gcc` | `qemu-aarch64` | `/usr/aarch64-linux-gnu/` |
-| ARM32 | `arm-linux-gnueabi-gcc` | `qemu-arm` | `/usr/arm-linux-gnueabi/` |
-
-On Debian or Ubuntu, install them with:
-
-在 Debian 或 Ubuntu 上，可使用以下命令安装：
-
-```bash
-sudo apt install gcc-aarch64-linux-gnu gcc-arm-linux-gnueabi qemu-user
-```
-
-Override tool locations with `WACC_AARCH64_GCC`, `WACC_AARCH64_QEMU`, `WACC_AARCH64_SYSROOT`, `WACC_ARM32_GCC`, `WACC_ARM32_QEMU`, and `WACC_ARM32_SYSROOT`.
-
-可以通过 `WACC_AARCH64_GCC`、`WACC_AARCH64_QEMU`、`WACC_AARCH64_SYSROOT`、`WACC_ARM32_GCC`、`WACC_ARM32_QEMU` 和 `WACC_ARM32_SYSROOT` 覆盖工具路径。
-
-## Docker / Docker 容器
-
-Docker provides the supported complete runtime. The image builds the Scala compiler and includes both GNU cross-toolchains, Linux sysroots, and QEMU.
-
-Docker 提供受支持的完整运行环境。镜像会构建 Scala 编译器，并包含两个 GNU 交叉工具链、Linux sysroot 和 QEMU。
-
-```bash
-docker compose up --build
-```
-
-Open [http://127.0.0.1:3000](http://127.0.0.1:3000) on the host. Other devices on the same network can use `http://<computer-lan-ip>:3000`; allow inbound TCP port 3000 in the host firewall.
-
-在宿主机上打开 [http://127.0.0.1:3000](http://127.0.0.1:3000)。同一局域网中的其他设备可访问 `http://<computer-lan-ip>:3000`；请在宿主机防火墙中允许入站 TCP 3000 端口。
-
-The container runs without root privileges or Linux capabilities, uses a read-only filesystem, limits process count, and has a temporary 256 MB compilation directory.
-
-容器以非 root 用户运行且不具备 Linux capabilities，使用只读文件系统，限制进程数量，并提供 256 MB 的临时编译目录。
-
-## Deploy on Render / 部署到 Render
-
-`render.yaml` defines a Docker-based HTTPS web service. To deploy it:
-
-`render.yaml` 定义了一个基于 Docker 的 HTTPS Web 服务。部署步骤如下：
-
-1. Push this repository to GitHub or GitLab. / 将此仓库推送到 GitHub 或 GitLab。
-2. In Render, create a new Blueprint and connect the repository. / 在 Render 中创建 Blueprint 并连接仓库。
-3. Apply the detected `render.yaml` service. / 应用识别到的 `render.yaml` 服务。
-4. Open the assigned `https://...onrender.com` URL from any device. / 在任意设备上打开分配的 `https://...onrender.com` 地址。
-
-Client devices do not need a compiler, GCC, QEMU, Docker, or WACC files. Each submitted program is processed in its own temporary directory and removed after the request completes.
-
-客户端设备不需要安装编译器、GCC、QEMU、Docker 或 WACC 文件。每个提交的程序都在独立的临时目录中处理，并会在请求完成后删除。
-
-Useful production settings / 常用生产环境配置：
-
-| Variable / 变量 | Default / 默认值 | Purpose / 用途 |
-| --- | ---: | --- |
-| `MAX_CONCURRENT_JOBS` | `2` | Simultaneous compiler jobs / 同时执行的编译任务数 |
-| `MAX_QUEUED_JOBS` | `20` | Requests waiting for a worker / 等待工作进程的请求数 |
-| `RATE_LIMIT_REQUESTS` | `30` | Compile requests per client per window / 每个客户端在窗口期内的编译请求数 |
-| `RATE_LIMIT_WINDOW_MS` | `60000` | Rate-limit window in milliseconds / 限流窗口（毫秒） |
-| `TRUST_PROXY` | `0` | Set to `1` behind Render or another trusted proxy / 位于 Render 或其他可信代理后时设为 `1` |
-
-## Contributing / 参与开发
-
-Keep compiler changes and web-service changes covered by the relevant tests. Do not commit generated binaries, build output, or temporary files. Use a focused commit message that describes the user-visible change or the compiler component affected.
-
-修改编译器或 Web 服务时，请运行对应测试。不要提交生成的二进制文件、构建产物或临时文件。提交信息应聚焦描述用户可见的变化，或受影响的编译器组件。
-
-## 王哥到此一游: Charlie Wang involved in part of this project :D
+- target architecture: `arm32`,
+- peephole optimisation: enabled,
+- output file: `<program>.s` in the current working directory.
