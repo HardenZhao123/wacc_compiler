@@ -19,9 +19,12 @@
           <small>Compiler Studio</small>
         </span>
       </a>
-      <div class="header-status" id="environmentStatus">
-        <span class="status-dot"></span>
-        <span>Checking local toolchain</span>
+      <div class="header-actions">
+        <button id="specButton" class="button button-secondary spec-open-button" type="button">Language spec</button>
+        <div class="header-status" id="environmentStatus">
+          <span class="status-dot"></span>
+          <span>Checking local toolchain</span>
+        </div>
       </div>
     </header>
 
@@ -140,6 +143,28 @@ end</textarea>
         </article>
       </section>
     </main>
+
+    <div id="specDialog" class="spec-dialog" hidden>
+      <div class="spec-backdrop" data-spec-close></div>
+      <section class="spec-panel" role="dialog" aria-modal="true" aria-labelledby="specTitle" aria-describedby="specMeta">
+        <header class="spec-header">
+          <div>
+            <p class="panel-kicker">Reference</p>
+            <h2 id="specTitle">WACC Language Specification</h2>
+          </div>
+          <button id="specCloseButton" class="icon-button" type="button">Close</button>
+        </header>
+
+        <div class="spec-toolbar">
+          <span id="specMeta">Compiler syntax and semantic rules</span>
+          <button id="specCopyButton" class="icon-button" type="button" disabled>Copy spec</button>
+        </div>
+
+        <article id="specContent" class="spec-content" tabindex="0">
+          <p class="spec-loading">Loading specification...</p>
+        </article>
+      </section>
+    </div>
 
     <div id="toast" class="toast" role="status" aria-live="polite"></div>
     <script src="/app.js" defer></script>

@@ -88,6 +88,11 @@ console.log("compiled " + path.basename(sourcePath));
   assert.equal(manifest.statusCode, 200);
   assert.match(manifest.headers["content-type"], /application\/manifest\+json/);
 
+  const spec = await request(address.port, "GET", "/wacc-language-spec.md");
+  assert.equal(spec.statusCode, 200);
+  assert.match(spec.headers["content-type"], /text\/markdown/);
+  assert.match(spec.body, /WACC Language Specification/);
+
   const readiness = await request(address.port, "GET", "/api/ready");
   assert.ok(readiness.statusCode === 200 || readiness.statusCode === 503);
   assert.equal(typeof JSON.parse(readiness.body).ready, "boolean");
