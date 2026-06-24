@@ -1,0 +1,14 @@
+# side-effecting increment requires an int or float lvalue
+
+# Output:
+# #semantic_error#
+
+# Exit:
+# 200
+
+# Program:
+
+begin
+  bool b = true;
+  ++b
+end

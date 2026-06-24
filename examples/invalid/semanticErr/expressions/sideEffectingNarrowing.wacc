@@ -1,0 +1,14 @@
+# compound assignment cannot write a float result back into an int lvalue
+
+# Output:
+# #semantic_error#
+
+# Exit:
+# 200
+
+# Program:
+
+begin
+  int x = 1;
+  x += 1.5
+end

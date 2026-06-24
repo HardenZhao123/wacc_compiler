@@ -1,0 +1,13 @@
+# compound assignment requires an lvalue on the left hand side
+
+# Output:
+# #syntax_error#
+
+# Exit:
+# 100
+
+# Program:
+
+begin
+  1 += 2
+end
