@@ -185,6 +185,116 @@ process.stdin.on("end", () => console.log("Hello from emulated WACC"));
   }).ready, true);
 });
 
+test("keeps a running program open for sequential input", async (t) => {
+  const fakeDir = await fs.mkdtemp(path.join(os.tmpdir(), "wacc-interactive-test-"));
+  const fakeCompiler = path.join(fakeDir, "fake-compiler.js");
+  const fakeLinker = path.join(fakeDir, "fake-linker.js");
+  const fakeQemu = path.join(fakeDir, "fake-qemu.js");
+
+  await fs.writeFile(fakeCompiler, `#!/usr/bin/env node
+const fs = require("node:fs");
+const path = require("node:path");
+fs.writeFileSync(path.join(process.cwd(), "program.s"), ".text\\n.global main\\n");
+`, { mode: 0o755 });
+  await fs.writeFile(fakeLinker, `#!/usr/bin/env node
+const fs = require("node:fs");
+const outputIndex = process.argv.indexOf("-o") + 1;
+fs.writeFileSync(process.argv[outputIndex], "fake binary");
+`, { mode: 0o755 });
+  await fs.writeFile(fakeQemu, `#!/usr/bin/env node
+let buffer = "";
+let reads = 0;
+process.stdin.setEncoding("utf8");
+process.stdout.write("first> ");
+process.stdin.on("data", (chunk) => {
+  buffer += chunk;
+  let newline;
+  while ((newline = buffer.indexOf("\\n")) !== -1) {
+    const line = buffer.slice(0, newline);
+    buffer = buffer.slice(newline + 1);
+    reads += 1;
+    console.log("got " + line);
+    if (reads === 1) {
+      process.stdout.write("second> ");
+    } else {
+      console.log("done");
+      process.exit(0);
+    }
+  }
+});
+`, { mode: 0o755 });
+  await fs.mkdir(path.join(fakeDir, "lib"));
+  await fs.writeFile(path.join(fakeDir, "lib", "Scrt1.o"), "fake startup object");
+  await fs.writeFile(path.join(fakeDir, "lib", "crti.o"), "fake startup object");
+
+  const previous = {
+    gcc: process.env.WACC_AARCH64_GCC,
+    qemu: process.env.WACC_AARCH64_QEMU,
+    sysroot: process.env.WACC_AARCH64_SYSROOT,
+  };
+  process.env.WACC_AARCH64_GCC = fakeLinker;
+  process.env.WACC_AARCH64_QEMU = fakeQemu;
+  process.env.WACC_AARCH64_SYSROOT = fakeDir;
+
+  const server = createServer({
+    compilerCommand: { command: fakeCompiler, prefixArgs: [] },
+    finishedRunRetentionMs: 5_000,
+  });
+  await new Promise((resolve) => server.listen(0, "127.0.0.1", resolve));
+
+  t.after(async () => {
+    await new Promise((resolve) => server.close(resolve));
+    restoreEnv("WACC_AARCH64_GCC", previous.gcc);
+    restoreEnv("WACC_AARCH64_QEMU", previous.qemu);
+    restoreEnv("WACC_AARCH64_SYSROOT", previous.sysroot);
+    await fs.rm(fakeDir, { recursive: true, force: true });
+  });
+
+  const address = server.address();
+  const started = await request(address.port, "POST", "/api/runs", {
+    source: "begin\n  skip\nend",
+    architecture: "aarch64",
+    optimise: true,
+    run: true,
+    stdin: "",
+  });
+  assert.equal(started.statusCode, 200);
+  const startedResult = JSON.parse(started.body);
+  assert.equal(startedResult.ok, true);
+  assert.equal(startedResult.phase, "running");
+  assert.equal(startedResult.execution.running, true);
+  assert.ok(startedResult.sessionId);
+
+  const firstPrompt = await waitForRun(address.port, startedResult.sessionId, (result) => (
+    result.execution.running && result.execution.stdout.includes("first> ")
+  ));
+  assert.match(firstPrompt.execution.stdout, /first> /);
+
+  const firstInput = await request(address.port, "POST", `/api/runs/${startedResult.sessionId}/input`, {
+    input: "41",
+  });
+  assert.equal(firstInput.statusCode, 200);
+
+  const secondPrompt = await waitForRun(address.port, startedResult.sessionId, (result) => (
+    result.execution.running
+      && result.execution.stdout.includes("got 41")
+      && result.execution.stdout.includes("second> ")
+  ));
+  assert.match(secondPrompt.execution.stdout, /got 41/);
+  assert.match(secondPrompt.execution.stdout, /second> /);
+
+  const secondInput = await request(address.port, "POST", `/api/runs/${startedResult.sessionId}/input`, {
+    input: "42",
+  });
+  assert.equal(secondInput.statusCode, 200);
+
+  const finished = await waitForRun(address.port, startedResult.sessionId, (result) => !result.execution.running);
+  assert.equal(finished.ok, true);
+  assert.equal(finished.execution.exitCode, 0);
+  assert.match(finished.execution.stdout, /got 42/);
+  assert.match(finished.execution.stdout, /done/);
+});
+
 function request(port, method, pathname, body) {
   return new Promise((resolve, reject) => {
     const encoded = body === undefined ? null : JSON.stringify(body);
@@ -209,6 +319,19 @@ function request(port, method, pathname, body) {
     req.on("error", reject);
     req.end(encoded || undefined);
   });
+}
+
+async function waitForRun(port, sessionId, predicate) {
+  const deadline = Date.now() + 2_000;
+  let lastResult = null;
+  while (Date.now() < deadline) {
+    const response = await request(port, "GET", `/api/runs/${sessionId}`);
+    assert.equal(response.statusCode, 200);
+    lastResult = JSON.parse(response.body);
+    if (predicate(lastResult)) return lastResult;
+    await new Promise((resolve) => setTimeout(resolve, 25));
+  }
+  throw new Error(`Timed out waiting for run state: ${JSON.stringify(lastResult)}`);
 }
 
 function restoreEnv(name, value) {

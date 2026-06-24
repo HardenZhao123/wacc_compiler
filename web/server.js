@@ -3,6 +3,7 @@ const fs = require("node:fs");
 const fsp = require("node:fs/promises");
 const os = require("node:os");
 const path = require("node:path");
+const crypto = require("node:crypto");
 const { spawn } = require("node:child_process");
 
 const PROJECT_ROOT = path.resolve(__dirname, "..");
@@ -10,7 +11,11 @@ const PUBLIC_ROOT = path.join(__dirname, "public");
 const MAX_BODY_BYTES = 512 * 1024;
 const MAX_SOURCE_CHARS = 200_000;
 const MAX_STDIN_CHARS = 64_000;
+const MAX_INTERACTIVE_INPUT_CHARS = 8_000;
 const MAX_PROCESS_OUTPUT_BYTES = 2 * 1024 * 1024;
+const MAX_INTERACTIVE_RUN_SESSIONS = 8;
+const INTERACTIVE_RUN_TIMEOUT_MS = 10 * 60_000;
+const FINISHED_RUN_RETENTION_MS = 60_000;
 const DEFAULT_MAX_CONCURRENT_JOBS = 2;
 const DEFAULT_MAX_QUEUED_JOBS = 20;
 const DEFAULT_RATE_LIMIT = 30;
@@ -218,6 +223,25 @@ function validateCompileRequest(body) {
   };
 }
 
+function validateInteractiveInputRequest(body) {
+  if (!body || typeof body !== "object" || Array.isArray(body)) {
+    throw Object.assign(new Error("Request body must be an object"), { statusCode: 400 });
+  }
+
+  const input = body.input ?? "";
+  if (typeof input !== "string" || input.length > MAX_INTERACTIVE_INPUT_CHARS) {
+    throw Object.assign(
+      new Error(`Program input cannot exceed ${MAX_INTERACTIVE_INPUT_CHARS} characters per send`),
+      { statusCode: 400 },
+    );
+  }
+
+  return {
+    input,
+    appendNewline: body.appendNewline !== false,
+  };
+}
+
 function findExecutable(command, env = process.env) {
   if (!command) return null;
   if (command.includes(path.sep)) {
@@ -259,6 +283,17 @@ function compilerInvocation(options = {}) {
   };
 }
 
+function appendOutputBuffer(current, chunk) {
+  if (current.length >= MAX_PROCESS_OUTPUT_BYTES) {
+    return { buffer: current, exceeded: true };
+  }
+  const remaining = MAX_PROCESS_OUTPUT_BYTES - current.length;
+  return {
+    buffer: Buffer.concat([current, chunk.subarray(0, remaining)]),
+    exceeded: chunk.length > remaining,
+  };
+}
+
 function runProcess(command, args, options = {}) {
   const startedAt = Date.now();
   return new Promise((resolve) => {
@@ -274,18 +309,16 @@ function runProcess(command, args, options = {}) {
       stdio: ["pipe", "pipe", "pipe"],
     });
 
-    const append = (current, chunk) => {
-      if (current.length >= MAX_PROCESS_OUTPUT_BYTES) {
-        outputExceeded = true;
-        return current;
-      }
-      const remaining = MAX_PROCESS_OUTPUT_BYTES - current.length;
-      if (chunk.length > remaining) outputExceeded = true;
-      return Buffer.concat([current, chunk.subarray(0, remaining)]);
-    };
-
-    child.stdout.on("data", (chunk) => { stdout = append(stdout, chunk); });
-    child.stderr.on("data", (chunk) => { stderr = append(stderr, chunk); });
+    child.stdout.on("data", (chunk) => {
+      const appended = appendOutputBuffer(stdout, chunk);
+      stdout = appended.buffer;
+      outputExceeded ||= appended.exceeded;
+    });
+    child.stderr.on("data", (chunk) => {
+      const appended = appendOutputBuffer(stderr, chunk);
+      stderr = appended.buffer;
+      outputExceeded ||= appended.exceeded;
+    });
 
     const timeout = setTimeout(() => {
       timedOut = true;
@@ -381,48 +414,31 @@ function serviceStatus(options = {}) {
   };
 }
 
-async function executeAssembly(tempDir, architecture, stdin) {
-  const config = runnerConfig(architecture);
-  const tools = toolchainStatus(architecture);
-  if (!tools.available) {
+function compilationFailureResult(build) {
+  if (build.compiler.spawnError) {
     return {
-      available: false,
-      exitCode: null,
-      stdout: "",
-      stderr: `Cannot run ${architecture}: missing ${tools.missing.join(", ")}. See README.md for setup instructions.`,
-      durationMs: 0,
-      timedOut: false,
+      ok: false,
+      phase: "compiler-start",
+      message: `Could not start the compiler: ${build.compiler.spawnError}`,
+      compiler: build.compiler,
+      assembly: build.assembly,
+      execution: null,
     };
   }
-
-  const assemblyPath = path.join(tempDir, "program.s");
-  const binaryPath = path.join(tempDir, "program.out");
-  const assembleResult = await runProcess(
-    config.compiler,
-    ["-o", binaryPath, ...config.compilerArgs, assemblyPath],
-    { cwd: tempDir, timeoutMs: 60_000 },
-  );
-
-  if (assembleResult.exitCode !== 0) {
+  if (build.compiler.exitCode !== 0) {
     return {
-      available: true,
-      stage: "assemble",
-      ...assembleResult,
+      ok: false,
+      phase: "compile",
+      message: build.compiler.timedOut ? "Compilation timed out" : "Compilation failed",
+      compiler: build.compiler,
+      assembly: build.assembly,
+      execution: null,
     };
   }
-
-  const emulatorArgs = [];
-  if (tools.sysroot) emulatorArgs.push("-L", tools.sysroot);
-  emulatorArgs.push(binaryPath);
-  const result = await runProcess(config.emulator, emulatorArgs, {
-    cwd: tempDir,
-    input: stdin,
-    timeoutMs: 10_000,
-  });
-  return { available: true, stage: "run", ...result };
+  return null;
 }
 
-async function compileProgram(request, options = {}) {
+async function buildProgram(request, options = {}) {
   const tempDir = await fsp.mkdtemp(path.join(os.tmpdir(), "wacc-web-"));
   const sourcePath = path.join(tempDir, "program.wacc");
   const assemblyPath = path.join(tempDir, "program.s");
@@ -451,29 +467,87 @@ async function compileProgram(request, options = {}) {
       // A failed frontend compilation correctly produces no assembly file.
     }
 
-    if (compiler.spawnError) {
-      return {
-        ok: false,
-        phase: "compiler-start",
-        message: `Could not start the compiler: ${compiler.spawnError}`,
-        compiler,
-        assembly,
-        execution: null,
-      };
-    }
-    if (compiler.exitCode !== 0) {
-      return {
-        ok: false,
-        phase: "compile",
-        message: compiler.timedOut ? "Compilation timed out" : "Compilation failed",
-        compiler,
-        assembly,
-        execution: null,
-      };
-    }
+    return {
+      tempDir,
+      sourcePath,
+      assemblyPath,
+      compiler,
+      assembly,
+    };
+  } catch (error) {
+    await fsp.rm(tempDir, { recursive: true, force: true });
+    throw error;
+  }
+}
+
+async function linkAssembly(tempDir, architecture) {
+  const config = runnerConfig(architecture);
+  const tools = toolchainStatus(architecture);
+  if (!tools.available) {
+    return {
+      ok: false,
+      execution: {
+        available: false,
+        stage: "run",
+        exitCode: null,
+        stdout: "",
+        stderr: `Cannot run ${architecture}: missing ${tools.missing.join(", ")}. See README.md for setup instructions.`,
+        durationMs: 0,
+        timedOut: false,
+      },
+    };
+  }
+
+  const assemblyPath = path.join(tempDir, "program.s");
+  const binaryPath = path.join(tempDir, "program.out");
+  const assembleResult = await runProcess(
+    config.compiler,
+    ["-o", binaryPath, ...config.compilerArgs, assemblyPath],
+    { cwd: tempDir, timeoutMs: 60_000 },
+  );
+
+  if (assembleResult.exitCode !== 0) {
+    return {
+      ok: false,
+      execution: {
+        available: true,
+        stage: "assemble",
+        ...assembleResult,
+      },
+    };
+  }
+
+  return {
+    ok: true,
+    config,
+    tools,
+    binaryPath,
+  };
+}
+
+async function executeAssembly(tempDir, architecture, stdin) {
+  const linked = await linkAssembly(tempDir, architecture);
+  if (!linked.ok) return linked.execution;
+
+  const emulatorArgs = [];
+  if (linked.tools.sysroot) emulatorArgs.push("-L", linked.tools.sysroot);
+  emulatorArgs.push(linked.binaryPath);
+  const result = await runProcess(linked.config.emulator, emulatorArgs, {
+    cwd: tempDir,
+    input: stdin,
+    timeoutMs: 10_000,
+  });
+  return { available: true, stage: "run", ...result };
+}
+
+async function compileProgram(request, options = {}) {
+  const build = await buildProgram(request, options);
+  try {
+    const failure = compilationFailureResult(build);
+    if (failure) return failure;
 
     const execution = request.run
-      ? await executeAssembly(tempDir, request.architecture, request.stdin)
+      ? await executeAssembly(build.tempDir, request.architecture, request.stdin)
       : null;
     const executionSucceeded = !execution || (
       execution.available
@@ -489,12 +563,293 @@ async function compileProgram(request, options = {}) {
       message: execution && !executionSucceeded ? execution.stderr : "Compilation succeeded",
       architecture: request.architecture,
       optimise: request.optimise,
-      compiler,
-      assembly,
+      compiler: build.compiler,
+      assembly: build.assembly,
       execution,
     };
   } finally {
-    await fsp.rm(tempDir, { recursive: true, force: true });
+    await fsp.rm(build.tempDir, { recursive: true, force: true });
+  }
+}
+
+class InteractiveRunSession {
+  constructor({ id, child, tempDir, compiler, assembly, architecture, optimise, onFinished }) {
+    this.id = id;
+    this.child = child;
+    this.tempDir = tempDir;
+    this.compiler = compiler;
+    this.assembly = assembly;
+    this.architecture = architecture;
+    this.optimise = optimise;
+    this.onFinished = onFinished;
+    this.startedAt = Date.now();
+    this.closedAt = null;
+    this.exitCode = null;
+    this.stdout = Buffer.alloc(0);
+    this.stderr = Buffer.alloc(0);
+    this.outputExceeded = false;
+    this.timedOut = false;
+    this.stopped = false;
+    this.spawnError = null;
+    this.inputChars = 0;
+    this.cleanupTimer = null;
+    this.killTimer = null;
+
+    this.timeout = setTimeout(() => {
+      this.timedOut = true;
+      this.child.kill("SIGKILL");
+    }, INTERACTIVE_RUN_TIMEOUT_MS);
+    this.timeout.unref?.();
+
+    child.stdout.on("data", (chunk) => this.appendOutput("stdout", chunk));
+    child.stderr.on("data", (chunk) => this.appendOutput("stderr", chunk));
+    child.on("error", (error) => {
+      this.spawnError = error.message;
+      this.finish(null);
+    });
+    child.on("close", (code) => this.finish(code));
+  }
+
+  appendOutput(stream, chunk) {
+    const appended = appendOutputBuffer(this[stream], chunk);
+    this[stream] = appended.buffer;
+    this.outputExceeded ||= appended.exceeded;
+  }
+
+  finish(exitCode) {
+    if (this.closedAt) return;
+    this.closedAt = Date.now();
+    this.exitCode = exitCode;
+    clearTimeout(this.timeout);
+    clearTimeout(this.killTimer);
+    try {
+      if (!this.child.stdin.destroyed) this.child.stdin.destroy();
+    } catch {
+      // The child process may already have closed stdin.
+    }
+    this.onFinished?.(this);
+  }
+
+  write(input, appendNewline) {
+    if (this.closedAt) {
+      throw Object.assign(new Error("Program has already finished"), { statusCode: 409 });
+    }
+
+    const text = appendNewline && !input.endsWith("\n") ? `${input}\n` : input;
+    if (this.inputChars + text.length > MAX_STDIN_CHARS) {
+      throw Object.assign(
+        new Error(`Program input cannot exceed ${MAX_STDIN_CHARS} characters per run`),
+        { statusCode: 400 },
+      );
+    }
+    this.inputChars += text.length;
+
+    return new Promise((resolve, reject) => {
+      this.child.stdin.write(text, "utf8", (error) => {
+        if (!error) {
+          resolve();
+          return;
+        }
+        reject(Object.assign(new Error("Could not send input to the running program"), {
+          statusCode: this.closedAt ? 409 : 500,
+        }));
+      });
+    });
+  }
+
+  stop() {
+    this.stopped = true;
+    if (this.closedAt) return;
+    this.child.kill("SIGTERM");
+    this.killTimer = setTimeout(() => {
+      if (!this.closedAt) this.child.kill("SIGKILL");
+    }, 1_000);
+    this.killTimer.unref?.();
+  }
+
+  snapshot() {
+    const finished = Boolean(this.closedAt);
+    return {
+      available: true,
+      stage: "run",
+      running: !finished,
+      stopped: this.stopped,
+      exitCode: finished ? this.exitCode : null,
+      stdout: this.stdout.toString("utf8"),
+      stderr: this.stderr.toString("utf8"),
+      durationMs: (this.closedAt || Date.now()) - this.startedAt,
+      timedOut: this.timedOut,
+      outputExceeded: this.outputExceeded,
+      spawnError: this.spawnError,
+    };
+  }
+
+  async cleanup() {
+    clearTimeout(this.timeout);
+    clearTimeout(this.killTimer);
+    clearTimeout(this.cleanupTimer);
+    if (!this.closedAt) this.stop();
+    await fsp.rm(this.tempDir, { recursive: true, force: true });
+  }
+}
+
+class InteractiveRunStore {
+  constructor(options = {}) {
+    this.maxSessions = options.maxSessions || MAX_INTERACTIVE_RUN_SESSIONS;
+    this.finishedRetentionMs = options.finishedRetentionMs || FINISHED_RUN_RETENTION_MS;
+    this.sessions = new Map();
+  }
+
+  get status() {
+    let running = 0;
+    for (const session of this.sessions.values()) {
+      if (!session.closedAt) running += 1;
+    }
+    return {
+      running,
+      retained: this.sessions.size - running,
+      maxSessions: this.maxSessions,
+    };
+  }
+
+  responseFor(session) {
+    const execution = session.snapshot();
+    const finishedOk = !execution.running
+      && execution.exitCode === 0
+      && !execution.timedOut
+      && !execution.spawnError
+      && !execution.stopped;
+    return {
+      ok: execution.running || finishedOk,
+      phase: execution.running ? "running" : "complete",
+      message: execution.running
+        ? "Program is running"
+        : execution.stopped
+          ? "Program stopped"
+          : finishedOk
+            ? "Program finished"
+            : execution.timedOut
+              ? "Program timed out"
+              : "Program failed",
+      sessionId: session.id,
+      architecture: session.architecture,
+      optimise: session.optimise,
+      compiler: session.compiler,
+      assembly: session.assembly,
+      execution,
+    };
+  }
+
+  get(id) {
+    const session = this.sessions.get(id);
+    if (!session) {
+      throw Object.assign(new Error("Run session not found"), { statusCode: 404 });
+    }
+    return session;
+  }
+
+  scheduleCleanup(session) {
+    clearTimeout(session.cleanupTimer);
+    session.cleanupTimer = setTimeout(() => {
+      this.delete(session.id).catch((error) => console.error(error));
+    }, this.finishedRetentionMs);
+    session.cleanupTimer.unref?.();
+  }
+
+  async delete(id) {
+    const session = this.sessions.get(id);
+    if (!session) return;
+    this.sessions.delete(id);
+    await session.cleanup();
+  }
+
+  async closeAll() {
+    await Promise.all(Array.from(this.sessions.keys(), (id) => this.delete(id)));
+  }
+
+  async start(request, options = {}) {
+    for (const session of this.sessions.values()) {
+      if (session.closedAt && Date.now() - session.closedAt >= this.finishedRetentionMs) {
+        await this.delete(session.id);
+      }
+    }
+    if (this.sessions.size >= this.maxSessions) {
+      throw Object.assign(new Error("Too many interactive programs are running. Stop one and try again."), {
+        statusCode: 503,
+      });
+    }
+
+    const build = await buildProgram(request, options);
+    let session = null;
+    try {
+      const failure = compilationFailureResult(build);
+      if (failure) {
+        await fsp.rm(build.tempDir, { recursive: true, force: true });
+        return failure;
+      }
+
+      const linked = await linkAssembly(build.tempDir, request.architecture);
+      if (!linked.ok) {
+        await fsp.rm(build.tempDir, { recursive: true, force: true });
+        return {
+          ok: false,
+          phase: "run-environment",
+          message: linked.execution.stderr,
+          architecture: request.architecture,
+          optimise: request.optimise,
+          compiler: build.compiler,
+          assembly: build.assembly,
+          execution: linked.execution,
+        };
+      }
+
+      const emulatorArgs = [];
+      if (linked.tools.sysroot) emulatorArgs.push("-L", linked.tools.sysroot);
+      emulatorArgs.push(linked.binaryPath);
+
+      const id = crypto.randomUUID();
+      const child = spawn(linked.config.emulator, emulatorArgs, {
+        cwd: build.tempDir,
+        env: process.env,
+        stdio: ["pipe", "pipe", "pipe"],
+      });
+      session = new InteractiveRunSession({
+        id,
+        child,
+        tempDir: build.tempDir,
+        compiler: build.compiler,
+        assembly: build.assembly,
+        architecture: request.architecture,
+        optimise: request.optimise,
+        onFinished: (finishedSession) => this.scheduleCleanup(finishedSession),
+      });
+      this.sessions.set(id, session);
+
+      if (request.stdin) {
+        try {
+          await session.write(request.stdin, true);
+        } catch (error) {
+          if (!session.closedAt) throw error;
+        }
+      }
+      return this.responseFor(session);
+    } catch (error) {
+      if (session) await this.delete(session.id);
+      else await fsp.rm(build.tempDir, { recursive: true, force: true });
+      throw error;
+    }
+  }
+
+  async sendInput(id, inputRequest) {
+    const session = this.get(id);
+    await session.write(inputRequest.input, inputRequest.appendNewline);
+    return this.responseFor(session);
+  }
+
+  stop(id) {
+    const session = this.get(id);
+    session.stop();
+    return this.responseFor(session);
   }
 }
 
@@ -526,13 +881,17 @@ function createServer(options = {}) {
     positiveInteger(process.env.MAX_CONCURRENT_JOBS, DEFAULT_MAX_CONCURRENT_JOBS),
     positiveInteger(process.env.MAX_QUEUED_JOBS, DEFAULT_MAX_QUEUED_JOBS),
   );
+  const runSessions = options.runSessions || new InteractiveRunStore({
+    maxSessions: options.maxInteractiveRunSessions,
+    finishedRetentionMs: options.finishedRunRetentionMs,
+  });
   const rateLimiter = options.rateLimiter || new FixedWindowRateLimiter(
     positiveInteger(process.env.RATE_LIMIT_REQUESTS, DEFAULT_RATE_LIMIT),
     positiveInteger(process.env.RATE_LIMIT_WINDOW_MS, RATE_LIMIT_WINDOW_MS),
   );
   const trustProxy = options.trustProxy ?? process.env.TRUST_PROXY === "1";
 
-  return http.createServer(async (req, res) => {
+  const server = http.createServer(async (req, res) => {
     const url = new URL(req.url, "http://localhost");
     setSecurityHeaders(res);
     try {
@@ -546,6 +905,7 @@ function createServer(options = {}) {
             arm32: status.architectures.arm32.available,
           },
           queue: compileQueue.status,
+          runs: runSessions.status,
         }, req.method === "HEAD");
         return;
       }
@@ -557,6 +917,7 @@ function createServer(options = {}) {
           compiler: status.compiler,
           architectures: status.architectures,
           queue: compileQueue.status,
+          runs: runSessions.status,
         }, req.method === "HEAD");
         return;
       }
@@ -575,6 +936,56 @@ function createServer(options = {}) {
         }
         const source = await fsp.readFile(path.join(PROJECT_ROOT, example.file), "utf8");
         json(res, 200, { id, name: example.name, source });
+        return;
+      }
+
+      if (req.method === "POST" && url.pathname === "/api/runs") {
+        const rateLimit = rateLimiter.consume(clientAddress(req, trustProxy));
+        res.setHeader("RateLimit-Limit", String(rateLimiter.limit));
+        res.setHeader("RateLimit-Remaining", String(rateLimit.remaining));
+        if (!rateLimit.allowed) {
+          res.setHeader("Retry-After", String(rateLimit.retryAfterSeconds));
+          json(res, 429, { error: "Too many compile requests. Please wait before trying again." });
+          return;
+        }
+        const contentType = (req.headers["content-type"] || "").split(";", 1)[0].trim();
+        if (contentType !== "application/json") {
+          json(res, 415, { error: "Content-Type must be application/json" });
+          return;
+        }
+        const request = validateCompileRequest(await readJsonBody(req));
+        const result = await compileQueue.run(() => runSessions.start({ ...request, run: true }, options));
+        json(res, 200, result);
+        return;
+      }
+
+      const runPath = /^\/api\/runs\/([^/]+)(?:\/([^/]+))?$/.exec(url.pathname);
+      if (runPath) {
+        const id = decodeURIComponent(runPath[1]);
+        const action = runPath[2];
+
+        if (req.method === "GET" && !action) {
+          json(res, 200, runSessions.responseFor(runSessions.get(id)));
+          return;
+        }
+
+        if (req.method === "POST" && action === "input") {
+          const contentType = (req.headers["content-type"] || "").split(";", 1)[0].trim();
+          if (contentType !== "application/json") {
+            json(res, 415, { error: "Content-Type must be application/json" });
+            return;
+          }
+          const input = validateInteractiveInputRequest(await readJsonBody(req));
+          json(res, 200, await runSessions.sendInput(id, input));
+          return;
+        }
+
+        if ((req.method === "DELETE" && !action) || (req.method === "POST" && action === "stop")) {
+          json(res, 200, runSessions.stop(id));
+          return;
+        }
+
+        json(res, 404, { error: "Not found" });
         return;
       }
 
@@ -611,6 +1022,11 @@ function createServer(options = {}) {
       });
     }
   });
+
+  server.on("close", () => {
+    runSessions.closeAll().catch((error) => console.error(error));
+  });
+  return server;
 }
 
 if (require.main === module) {
@@ -631,6 +1047,7 @@ if (require.main === module) {
 
 module.exports = {
   FixedWindowRateLimiter,
+  InteractiveRunStore,
   JobQueue,
   compileProgram,
   createServer,
@@ -638,4 +1055,5 @@ module.exports = {
   serviceStatus,
   toolchainStatus,
   validateCompileRequest,
+  validateInteractiveInputRequest,
 };

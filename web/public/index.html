@@ -96,8 +96,8 @@ end</textarea>
           </div>
 
           <details class="stdin-panel">
-            <summary>Program input <span>stdin</span></summary>
-            <textarea id="stdinInput" aria-label="Program standard input" placeholder="Input consumed by read statements..."></textarea>
+            <summary>Initial input <span>stdin</span></summary>
+            <textarea id="stdinInput" aria-label="Initial program standard input" placeholder="Optional input sent when the run starts..."></textarea>
           </details>
 
           <div class="editor-actions">
@@ -140,6 +140,13 @@ end</textarea>
             </div>
             <pre id="resultView" tabindex="0" hidden></pre>
           </div>
+
+          <form id="interactiveInputForm" class="interactive-input" hidden>
+            <label class="sr-only" for="interactiveInput">Program input line</label>
+            <input id="interactiveInput" type="text" autocomplete="off" spellcheck="false" placeholder="Type one input value">
+            <button id="sendInputButton" class="button button-secondary" type="submit">Send</button>
+            <button id="stopRunButton" class="icon-button stop-run-button" type="button">Stop</button>
+          </form>
         </article>
       </section>
     </main>

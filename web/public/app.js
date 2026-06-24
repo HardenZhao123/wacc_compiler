@@ -20,6 +20,10 @@ const specDialog = document.querySelector("#specDialog");
 const specCloseButton = document.querySelector("#specCloseButton");
 const specCopyButton = document.querySelector("#specCopyButton");
 const specContent = document.querySelector("#specContent");
+const interactiveInputForm = document.querySelector("#interactiveInputForm");
+const interactiveInput = document.querySelector("#interactiveInput");
+const sendInputButton = document.querySelector("#sendInputButton");
+const stopRunButton = document.querySelector("#stopRunButton");
 
 let activeTab = "output";
 let latestResult = null;
@@ -27,6 +31,9 @@ let toastTimer = null;
 let specMarkdown = "";
 let specLoadPromise = null;
 let previousFocus = null;
+let activeRunId = null;
+let runPollTimer = null;
+let pollingRun = false;
 
 function updateLineNumbers() {
   const count = sourceEditor.value.split("\n").length;
@@ -230,15 +237,17 @@ function closeSpecification() {
 }
 
 function setBusy(busy, run) {
-  compileButton.disabled = busy;
-  runButton.disabled = busy;
+  const running = Boolean(activeRunId);
+  compileButton.disabled = busy || running;
+  runButton.disabled = busy || running;
+  stdinInput.disabled = busy || running;
   compileButton.textContent = busy && !run ? "Compiling..." : "Compile assembly";
   runButton.innerHTML = busy && run
-    ? "Running..."
+    ? "Starting..."
     : '<span class="play-icon" aria-hidden="true">▶</span> Compile &amp; run';
   if (busy) {
     resultBadge.className = "result-badge running";
-    resultBadge.textContent = run ? "Running" : "Compiling";
+    resultBadge.textContent = run ? "Starting" : "Compiling";
   }
 }
 
@@ -253,6 +262,33 @@ function compilerLog(result) {
   return sections.filter(Boolean).join("\n\n");
 }
 
+function updateResultBadge(result, action = "compile") {
+  if (result.execution?.running) {
+    resultBadge.className = "result-badge running";
+    resultBadge.textContent = result.execution.stopped ? "Stopping" : "Running";
+    return;
+  }
+
+  resultBadge.className = `result-badge ${result.ok ? "success" : "failure"}`;
+  resultBadge.textContent = result.ok
+    ? (result.sessionId || action === "run" ? "Finished" : "Compiled")
+    : "Failed";
+}
+
+function stopRunPolling() {
+  clearInterval(runPollTimer);
+  runPollTimer = null;
+  pollingRun = false;
+}
+
+function updateInteractiveControls() {
+  const acceptingInput = Boolean(activeRunId && latestResult?.execution?.running && !latestResult.execution.stopped);
+  interactiveInputForm.hidden = !acceptingInput;
+  interactiveInput.disabled = !acceptingInput;
+  sendInputButton.disabled = !acceptingInput;
+  stopRunButton.disabled = !acceptingInput;
+}
+
 function currentTabText() {
   if (!latestResult) return "";
   if (activeTab === "assembly") return latestResult.assembly || "No assembly was generated.";
@@ -265,26 +301,33 @@ function currentTabText() {
   }
   const execution = latestResult.execution;
   const parts = [];
-  if (execution.stdout) parts.push(execution.stdout.trimEnd());
-  if (execution.stderr) parts.push(execution.stderr.trimEnd());
+  if (execution.stdout) parts.push(execution.running ? execution.stdout : execution.stdout.trimEnd());
+  if (execution.stderr) parts.push(execution.running ? execution.stderr : execution.stderr.trimEnd());
   if (execution.exitCode !== null && execution.exitCode !== undefined) {
     parts.push(`Process exited with code ${execution.exitCode}`);
   }
-  return parts.filter(Boolean).join("\n\n") || "Program finished without output.";
+  if (parts.some(Boolean)) return parts.filter(Boolean).join("\n\n");
+  return execution.running ? "Program is running." : "Program finished without output.";
 }
 
 function renderResult() {
   const text = currentTabText();
+  const stickToBottom = activeTab === "output"
+    && !resultView.hidden
+    && resultView.scrollTop + resultView.clientHeight >= resultView.scrollHeight - 24;
   emptyState.hidden = Boolean(latestResult);
   resultView.hidden = !latestResult;
   resultView.textContent = text;
+  if (stickToBottom) resultView.scrollTop = resultView.scrollHeight;
   copyButton.disabled = !text;
   downloadButton.disabled = !latestResult?.assembly;
+  updateInteractiveControls();
 
   if (!latestResult) return;
   const duration = (latestResult.compiler?.durationMs || 0) + (latestResult.execution?.durationMs || 0);
   const arch = latestResult.architecture?.toUpperCase() || selectedArchitecture().toUpperCase();
-  resultMeta.textContent = `${arch} · ${latestResult.optimise ? "optimised" : "unoptimised"} · ${duration} ms`;
+  const state = latestResult.execution?.running ? "running" : "ready";
+  resultMeta.textContent = `${arch} · ${latestResult.optimise ? "optimised" : "unoptimised"} · ${state} · ${duration} ms`;
 }
 
 function switchTab(tabName) {
@@ -298,6 +341,11 @@ function switchTab(tabName) {
 }
 
 async function compile(run) {
+  if (run) {
+    await startInteractiveRun();
+    return;
+  }
+
   setBusy(true, run);
   try {
     const response = await fetch("/api/compile", {
@@ -315,11 +363,10 @@ async function compile(run) {
     if (!response.ok) throw new Error(result.error || "Request failed");
 
     latestResult = result;
-    resultBadge.className = `result-badge ${result.ok ? "success" : "failure"}`;
-    resultBadge.textContent = result.ok ? (run ? "Finished" : "Compiled") : "Failed";
+    updateResultBadge(result, "compile");
 
     if (!result.ok) switchTab(result.phase === "run-environment" ? "output" : "log");
-    else switchTab(run ? "output" : "assembly");
+    else switchTab("assembly");
   } catch (error) {
     latestResult = {
       ok: false,
@@ -336,6 +383,148 @@ async function compile(run) {
   } finally {
     setBusy(false, run);
     renderResult();
+  }
+}
+
+function finishRunIfNeeded(result) {
+  if (result.execution?.running) return false;
+  activeRunId = null;
+  stopRunPolling();
+  setBusy(false, false);
+  return true;
+}
+
+async function pollActiveRun() {
+  if (!activeRunId || pollingRun) return;
+  pollingRun = true;
+  const id = activeRunId;
+
+  try {
+    const response = await fetch(`/api/runs/${encodeURIComponent(id)}`);
+    const result = await response.json();
+    if (!response.ok) throw new Error(result.error || "Could not refresh program output");
+    if (id !== activeRunId) return;
+
+    latestResult = result;
+    updateResultBadge(result, "run");
+    finishRunIfNeeded(result);
+    renderResult();
+  } catch (error) {
+    stopRunPolling();
+    if (id === activeRunId) {
+      activeRunId = null;
+      showToast(error.message);
+      setBusy(false, false);
+      renderResult();
+    }
+  } finally {
+    pollingRun = false;
+  }
+}
+
+function startRunPolling() {
+  stopRunPolling();
+  pollActiveRun();
+  runPollTimer = setInterval(pollActiveRun, 350);
+}
+
+async function startInteractiveRun() {
+  setBusy(true, true);
+  try {
+    const response = await fetch("/api/runs", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        source: sourceEditor.value,
+        architecture: selectedArchitecture(),
+        optimise: optimiseInput.checked,
+        run: true,
+        stdin: stdinInput.value,
+      }),
+    });
+    const result = await response.json();
+    if (!response.ok) throw new Error(result.error || "Request failed");
+
+    latestResult = result;
+    updateResultBadge(result, "run");
+    if (result.sessionId && result.execution?.running) {
+      activeRunId = result.sessionId;
+      switchTab("output");
+      startRunPolling();
+      setTimeout(() => interactiveInput.focus(), 0);
+    } else {
+      finishRunIfNeeded(result);
+      if (!result.ok) switchTab(result.phase === "run-environment" ? "output" : "log");
+      else switchTab("output");
+    }
+  } catch (error) {
+    latestResult = {
+      ok: false,
+      message: error.message,
+      compiler: { stdout: "", stderr: "", durationMs: 0 },
+      assembly: "",
+      execution: null,
+      architecture: selectedArchitecture(),
+      optimise: optimiseInput.checked,
+    };
+    activeRunId = null;
+    stopRunPolling();
+    resultBadge.className = "result-badge failure";
+    resultBadge.textContent = "Failed";
+    switchTab("log");
+  } finally {
+    setBusy(false, true);
+    renderResult();
+  }
+}
+
+async function sendInteractiveInput() {
+  if (!activeRunId) return;
+  const input = interactiveInput.value;
+  interactiveInput.value = "";
+  sendInputButton.disabled = true;
+
+  try {
+    const response = await fetch(`/api/runs/${encodeURIComponent(activeRunId)}/input`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ input }),
+    });
+    const result = await response.json();
+    if (!response.ok) throw new Error(result.error || "Could not send input");
+
+    latestResult = result;
+    updateResultBadge(result, "run");
+    finishRunIfNeeded(result);
+    renderResult();
+  } catch (error) {
+    showToast(error.message);
+    renderResult();
+  } finally {
+    updateInteractiveControls();
+    if (!interactiveInput.disabled) interactiveInput.focus();
+  }
+}
+
+async function stopActiveRun() {
+  if (!activeRunId) return;
+  const id = activeRunId;
+  stopRunButton.disabled = true;
+
+  try {
+    const response = await fetch(`/api/runs/${encodeURIComponent(id)}`, { method: "DELETE" });
+    const result = await response.json();
+    if (!response.ok) throw new Error(result.error || "Could not stop program");
+    if (id !== activeRunId) return;
+
+    latestResult = result;
+    updateResultBadge(result, "run");
+    if (result.execution?.running) startRunPolling();
+    else finishRunIfNeeded(result);
+    renderResult();
+  } catch (error) {
+    showToast(error.message);
+    stopRunButton.disabled = false;
   }
 }
 
@@ -406,6 +595,11 @@ exampleSelect.addEventListener("change", async () => {
 
 compileButton.addEventListener("click", () => compile(false));
 runButton.addEventListener("click", () => compile(true));
+interactiveInputForm.addEventListener("submit", (event) => {
+  event.preventDefault();
+  sendInteractiveInput();
+});
+stopRunButton.addEventListener("click", stopActiveRun);
 specButton.addEventListener("click", openSpecification);
 specCloseButton.addEventListener("click", closeSpecification);
 specDialog.addEventListener("click", (event) => {
