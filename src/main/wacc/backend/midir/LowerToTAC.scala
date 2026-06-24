@@ -189,6 +189,8 @@ object LowerToTAC {
     case TypedStmt.Println(expr) =>
       lowerStmt(TypedStmt.Print(expr))
       ftx.emit(PrintLn())
+
+    case TypedStmt.ExprStmt(expr) => lowerExpr(expr)
   }
 
   private def lowerCatchHandler(handler: TypedCatchHandler, runtimeExId: Temp, exPtr: Temp, endLabel: Label)
@@ -279,14 +281,23 @@ object LowerToTAC {
     // Generic binary lowering covers arithmetic, comparisons, and bitwise ops once checks are handled elsewhere.
     val lv = lowerExpr(left)
     val rv = lowerExpr(right)
+    lowerBinaryRhsOp(lv, rv, ty, op)
+  }
+
+  private def lowerBinaryRhsOp(lhs: Rhs, rhs: Rhs, ty: SemanticType, op: BinaryOp)
+                              (using ftx: FuncContext): Temp = {
     val dst = ftx.fresh(sizeof(ty))
-    ftx.emit(BinOp(dst, op, lv, rv))
+    ftx.emit(BinOp(dst, op, lhs, rhs))
     dst
   }
 
   private def lowerAsFloat(expr: TypedExpr)(using ftx: FuncContext, lg: LabelGen, ctx: StringContext): Rhs = {
     val value = lowerExpr(expr)
-    expr.ty match {
+    lowerAsFloatRhs(value, expr.ty)
+  }
+
+  private def lowerAsFloatRhs(value: Rhs, ty: SemanticType)(using ftx: FuncContext): Rhs =
+    ty match {
       case SemFloat => value
       case SemInt =>
         val converted = ftx.fresh(BitLength._32)
@@ -294,15 +305,92 @@ object LowerToTAC {
         converted
       case other => throw new Exception(s"cannot convert ${SemanticType.show(other)} to float")
     }
-  }
 
   private def lowerFloatBinaryOp(left: TypedExpr, right: TypedExpr, op: FloatArithOp)
                                 (using ftx: FuncContext, lg: LabelGen, ctx: StringContext): Rhs = {
     val lv = lowerAsFloat(left)
     val rv = lowerAsFloat(right)
+    lowerFloatBinaryRhsOp(lv, rv, op)
+  }
+
+  private def lowerFloatBinaryRhsOp(lhs: Rhs, rhs: Rhs, op: FloatArithOp)
+                                   (using ftx: FuncContext): Temp = {
     val dst = ftx.fresh(BitLength._32)
-    ftx.emit(BinOp(dst, op, lv, rv))
+    ftx.emit(BinOp(dst, op, lhs, rhs))
     dst
+  }
+
+  private def lowerSideEffectTarget(lvalue: TypedLValue)
+                                   (using ftx: FuncContext, lg: LabelGen, ctx: StringContext): Val = lvalue match {
+    case a: TypedLValue.ArrayElem =>
+      val (basePtr, lastIdxRhs, elemLen) = lowerArrayElemForStore(a)
+      IndirectTemp(basePtr, idxAsOffset(lastIdxRhs), isArray = true, len = elemLen)
+    case _ => findLhs(lvalue)
+  }
+
+  private def loadSideEffectTarget(lvalue: TypedLValue)
+                                  (using ftx: FuncContext, lg: LabelGen, ctx: StringContext): (Val, Temp) = {
+    val target = lowerSideEffectTarget(lvalue)
+    val current = ftx.fresh(sizeof(lvalue.ty))
+    ftx.emit(TACAssign(current, target))
+    (target, current)
+  }
+
+  private def lowerSideEffectingUnaryOp(lvalue: TypedLValue, isIncrement: Boolean)
+                                       (using ftx: FuncContext, lg: LabelGen, ctx: StringContext): Rhs = {
+    val (target, current) = loadSideEffectTarget(lvalue)
+    val result = lvalue.ty match {
+      case SemFloat =>
+        val op = if isIncrement then FloatArithOp.Add else FloatArithOp.Sub
+        lowerFloatBinaryRhsOp(current, FloatValue(1.0f), op)
+      case SemInt =>
+        val op = if isIncrement then ArithOp.Add else ArithOp.Sub
+        if ftx.currentExceptionHandler.isDefined then
+          lowerCheckedArithmeticRhs(current, ImmValue(1), lvalue.ty, op)
+        else
+          lowerBinaryRhsOp(current, ImmValue(1), lvalue.ty, op)
+      case other => throw new Exception(s"side-effecting unary op on ${SemanticType.show(other)}")
+    }
+    ftx.emit(TACAssign(target, result))
+    result
+  }
+
+  private def lowerSideEffectingBinaryOp(left: TypedLValue, right: TypedExpr, op: TypedExpr.BinarySideEffectingOperation)
+                                        (using ftx: FuncContext, lg: LabelGen, ctx: StringContext): Rhs = {
+    val (target, current) = loadSideEffectTarget(left)
+    val result = left.ty match {
+      case SemFloat =>
+        val floatOp = op match {
+          case TypedExpr.BinarySideEffectingOperation.AddEqual => FloatArithOp.Add
+          case TypedExpr.BinarySideEffectingOperation.SubEqual => FloatArithOp.Sub
+          case TypedExpr.BinarySideEffectingOperation.MulEqual => FloatArithOp.Mul
+          case TypedExpr.BinarySideEffectingOperation.DivEqual => FloatArithOp.Div
+          case TypedExpr.BinarySideEffectingOperation.ModEqual => throw new Exception("float modulo is not supported")
+        }
+        lowerFloatBinaryRhsOp(current, lowerAsFloat(right), floatOp)
+
+      case SemInt =>
+        val rv = lowerExpr(right)
+        op match {
+          case TypedExpr.BinarySideEffectingOperation.AddEqual =>
+            if ftx.currentExceptionHandler.isDefined then lowerCheckedArithmeticRhs(current, rv, left.ty, ArithOp.Add)
+            else lowerBinaryRhsOp(current, rv, left.ty, ArithOp.Add)
+          case TypedExpr.BinarySideEffectingOperation.SubEqual =>
+            if ftx.currentExceptionHandler.isDefined then lowerCheckedArithmeticRhs(current, rv, left.ty, ArithOp.Sub)
+            else lowerBinaryRhsOp(current, rv, left.ty, ArithOp.Sub)
+          case TypedExpr.BinarySideEffectingOperation.MulEqual =>
+            if ftx.currentExceptionHandler.isDefined then lowerCheckedArithmeticRhs(current, rv, left.ty, ArithOp.Mul)
+            else lowerBinaryRhsOp(current, rv, left.ty, ArithOp.Mul)
+          case TypedExpr.BinarySideEffectingOperation.DivEqual =>
+            lowerCheckedDivisionRhs(current, rv, left.ty, ArithOp.Div)
+          case TypedExpr.BinarySideEffectingOperation.ModEqual =>
+            lowerCheckedDivisionRhs(current, rv, left.ty, ArithOp.Mod)
+        }
+
+      case other => throw new Exception(s"side-effecting binary op on ${SemanticType.show(other)}")
+    }
+    ftx.emit(TACAssign(target, result))
+    result
   }
 
   private def lowerShortCircuitBool(left: TypedExpr, right: TypedExpr, op: TypedExpr.BoolOperation)
@@ -337,6 +425,8 @@ object LowerToTAC {
     case ord @ TypedExpr.Ord(operand) => lowerUnaryOp(operand, ord.ty, UnaryOp.Ord)
     case chr @ TypedExpr.Chr(operand) => lowerCheckedChr(operand, chr.ty)
     case bitNot @ TypedExpr.BitNot(operand) => lowerUnaryOp(operand, bitNot.ty, UnaryOp.BitNot)
+    case TypedExpr.Increment(operand) => lowerSideEffectingUnaryOp(operand, isIncrement = true)
+    case TypedExpr.Decrement(operand) => lowerSideEffectingUnaryOp(operand, isIncrement = false)
 
     case ba @ TypedExpr.BinaryArithmetic(left, right, op) =>
       if ba.ty == SemFloat then {
@@ -355,6 +445,9 @@ object LowerToTAC {
         case TypedExpr.ArithmeticOperation.Div => lowerCheckedDivision(left, right, ba.ty, ArithOp.Div)
         case TypedExpr.ArithmeticOperation.Mod => lowerCheckedDivision(left, right, ba.ty, ArithOp.Mod)
       }
+
+    case TypedExpr.BinarySideEffecting(left, right, op) =>
+      lowerSideEffectingBinaryOp(left, right, op)
 
     case bc @ TypedExpr.BinaryCompare(left, right, op) =>
       val comparisonOp: BinaryOp = if left.ty == SemFloat then op match {
@@ -461,22 +554,30 @@ object LowerToTAC {
                                   (using ftx: FuncContext, lg: LabelGen, ctx: StringContext): Rhs = {
     val lv = lowerExpr(left)
     val rv = lowerExpr(right)
+    lowerCheckedDivisionRhs(lv, rv, ty, op)
+  }
+
+  private def lowerCheckedDivisionRhs(lhs: Rhs, rhs: Rhs, ty: SemanticType, op: ArithOp)
+                                     (using ftx: FuncContext, lg: LabelGen, ctx: StringContext): Temp = {
     // Division and modulo always guard against zero, regardless of whether the caller installs a catch handler.
-    lowerCheck(CondOp.NEQ, rv, ImmValue(0), ARITHMETIC_EXCEPTION, ERR_DIVIDE_BY_ZERO)
-    val dst = ftx.fresh(sizeof(ty))
-    ftx.emit(BinOp(dst, op, lv, rv))
-    dst
+    lowerCheck(CondOp.NEQ, rhs, ImmValue(0), ARITHMETIC_EXCEPTION, ERR_DIVIDE_BY_ZERO)
+    lowerBinaryRhsOp(lhs, rhs, ty, op)
   }
 
   private def lowerCheckedArithmetic(left: TypedExpr, right: TypedExpr, ty: SemanticType, op: ArithOp)
                                     (using ftx: FuncContext, lg: LabelGen, ctx: StringContext): Rhs = {
     val lv = lowerExpr(left)
     val rv = lowerExpr(right)
+    lowerCheckedArithmeticRhs(lv, rv, ty, op)
+  }
+
+  private def lowerCheckedArithmeticRhs(lhs: Rhs, rhs: Rhs, ty: SemanticType, op: ArithOp)
+                                       (using ftx: FuncContext, lg: LabelGen, ctx: StringContext): Temp = {
     val dst = ftx.fresh(sizeof(ty))
     val overflowLabel = lg.fresh(RUNTIME_CHECK_OVERFLOW)
     val endLabel = lg.fresh(RUNTIME_CHECK_END)
     // Checked ops branch to a synthesized exception path instead of encoding overflow in the result temp.
-    ftx.emit(CheckedBinOp(dst, op, lv, rv, overflowLabel))
+    ftx.emit(CheckedBinOp(dst, op, lhs, rhs, overflowLabel))
     ftx.emit(Jmp(endLabel))
     ftx.emit(Mark(overflowLabel))
     lowerImplicitException(ERR_INTEGER_OVERFLOW, INTEGER_OVERFLOW_EXCEPTION)

@@ -44,6 +44,22 @@ object TypeCheckerExpr {
       case Or(left, right) => checkBinaryOpFixed(left, right, SemBool, c, pos)((l, r) =>
         TypedExpr.BinaryBool(l, r, TypedExpr.BoolOperation.Or))
 
+      // Unary side-effecting operations: ++, --
+      case Increment(operand) => checkSideEffectingUnaryOp(operand, c, pos)(e => TypedExpr.Increment(e))
+      case Decrement(operand) => checkSideEffectingUnaryOp(operand, c, pos)(e => TypedExpr.Decrement(e))
+
+      // Binary side-effecting operations: +=, -=, *=, /=, %=
+      case AddEqual(left, right) => checkSideEffectingBinaryOp(left, right, c, pos)((l, r) =>
+        TypedExpr.BinarySideEffecting(l, r, TypedExpr.BinarySideEffectingOperation.AddEqual))
+      case SubEqual(left, right) => checkSideEffectingBinaryOp(left, right, c, pos)((l, r) =>
+        TypedExpr.BinarySideEffecting(l, r, TypedExpr.BinarySideEffectingOperation.SubEqual))
+      case MulEqual(left, right) => checkSideEffectingBinaryOp(left, right, c, pos)((l, r) =>
+        TypedExpr.BinarySideEffecting(l, r, TypedExpr.BinarySideEffectingOperation.MulEqual))
+      case DivEqual(left, right) => checkSideEffectingBinaryOp(left, right, c, pos)((l, r) =>
+        TypedExpr.BinarySideEffecting(l, r, TypedExpr.BinarySideEffectingOperation.DivEqual))
+      case ModEqual(left, right) => checkSideEffectingBinaryOpFixed(left, right, SemInt, c, pos)((l, r) =>
+        TypedExpr.BinarySideEffecting(l, r, TypedExpr.BinarySideEffectingOperation.ModEqual))
+
       // Equality
       case Equal(left, right) => checkEquality(left, right, c, pos)((l, r) =>
         TypedExpr.BinaryCompare(l, r, TypedExpr.CompareOperation.Equal))
@@ -194,5 +210,45 @@ object TypeCheckerExpr {
 
     val finalTyOpt = finalTyped.ty.satisfies(parentConstraint)(using ctx, pos)
     (finalTyOpt, finalTyped)
+  }
+
+  /* Helper for unary side-effecting expressions (++ and --) */
+  private def checkSideEffectingUnaryOp(operand: LValue, parentConstraint: Constraint, pos: PositionInfo)
+                                       (makeTyped: TypedLValue => TypedExpr)
+                                       (using ctx: TypeChecker.TypeCheckerCtx): (Option[SemanticType], TypedExpr) = {
+    val (_, lvalue) = TypeCheckerLR.checkLValue(operand, Constraint.Either(SemInt, SemFloat))
+    val finalTypedExpr = makeTyped(lvalue)
+    val finalTyOpt = finalTypedExpr.ty.satisfies(parentConstraint)(using ctx, pos)
+    (finalTyOpt, finalTypedExpr)
+  }
+
+  /* Helper for standard side-effecting arithmetic expressions (+=, -=, *=, /=) */
+  private def checkSideEffectingBinaryOp(left: LValue, right: Expr, parentConstraint: Constraint, pos: PositionInfo)
+                                        (makeTyped: (TypedLValue, TypedExpr) => TypedExpr)
+                                        (using ctx: TypeChecker.TypeCheckerCtx): (Option[SemanticType], TypedExpr) = {
+    val (_, lvalue) = TypeCheckerLR.checkLValue(left, Constraint.Either(SemInt, SemFloat))
+    val rightConstraint = lvalue.ty match {
+      case SemInt => Constraint.Is(SemInt)
+      case SemFloat => Constraint.Either(SemInt, SemFloat)
+      case _ => Constraint.Either(SemInt, SemFloat)
+    }
+    val (_, rightTyped) = checkExpr(right, rightConstraint)
+    val finalTypedExpr = makeTyped(lvalue, rightTyped)
+    val finalTyOpt = finalTypedExpr.ty.satisfies(parentConstraint)(using ctx, pos)
+    (finalTyOpt, finalTypedExpr)
+  }
+
+  /* Helper for assignment operations requiring a specific expected operand type (%= requires Int) */
+  private def checkSideEffectingBinaryOpFixed(left: LValue, right: Expr, operandExpected: SemanticType, parentConstraint: Constraint, pos: PositionInfo)
+                                             (makeTyped: (TypedLValue, TypedExpr) => TypedExpr)
+                                             (using ctx: TypeChecker.TypeCheckerCtx): (Option[SemanticType], TypedExpr) = {
+    val sideConstraint = Constraint.Is(operandExpected)
+
+    val (_, lvalue) = TypeCheckerLR.checkLValue(left, sideConstraint)
+    val (_, rightTyped) = checkExpr(right, sideConstraint)
+
+    val finalTypedExpr = makeTyped(lvalue, rightTyped)
+    val finalTyOpt = finalTypedExpr.ty.satisfies(parentConstraint)(using ctx, pos)
+    (finalTyOpt, finalTypedExpr)
   }
 }

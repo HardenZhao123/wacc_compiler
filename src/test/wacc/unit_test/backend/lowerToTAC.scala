@@ -250,6 +250,47 @@ final class LowerToTACTest extends AnyFunSuite {
     assert(got == expect)
   }
 
+  test("LowerToTAC: prefix increment reads, writes back, and returns the new value") {
+    val x = TypedLValue.Id("x", SemInt)
+    val got = lower(List(
+      Decl(x, TypedRValue.ExprR(IntLit(1))),
+      Print(Increment(x))
+    ))
+
+    val xTemp = TAC.Temp(0, TAC.BitLength._32)
+    val current = TAC.Temp(1, TAC.BitLength._32)
+    val updated = TAC.Temp(2, TAC.BitLength._32)
+    val expect = TAC.TACProgram(Seq(), Seq(), Seq(
+      TAC.TACAssign(xTemp, TAC.ImmValue(1)),
+      TAC.TACAssign(current, xTemp),
+      TAC.BinOp(updated, TAC.ArithOp.Add, current, TAC.ImmValue(1)),
+      TAC.TACAssign(xTemp, updated),
+      TAC.PrintInt(updated)
+    ), Seq(xTemp, current, updated))
+    assert(got == expect)
+  }
+
+  test("LowerToTAC: compound assignment reads, writes back, and returns the new value") {
+    val x = TypedLValue.Id("x", SemInt)
+    val expr = BinarySideEffecting(x, IntLit(3), BinarySideEffectingOperation.AddEqual)
+    val got = lower(List(
+      Decl(x, TypedRValue.ExprR(IntLit(4))),
+      Print(expr)
+    ))
+
+    val xTemp = TAC.Temp(0, TAC.BitLength._32)
+    val current = TAC.Temp(1, TAC.BitLength._32)
+    val updated = TAC.Temp(2, TAC.BitLength._32)
+    val expect = TAC.TACProgram(Seq(), Seq(), Seq(
+      TAC.TACAssign(xTemp, TAC.ImmValue(4)),
+      TAC.TACAssign(current, xTemp),
+      TAC.BinOp(updated, TAC.ArithOp.Add, current, TAC.ImmValue(3)),
+      TAC.TACAssign(xTemp, updated),
+      TAC.PrintInt(updated)
+    ), Seq(xTemp, current, updated))
+    assert(got == expect)
+  }
+
   test("LowerToTAC: simple if-else statement with skips") {
     val got = lower(List(
       IfElse(BinaryBool(BoolLit(true), BoolLit(false), BoolOperation.And),

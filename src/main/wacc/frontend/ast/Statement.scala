@@ -54,6 +54,7 @@ object Stmt{
   case class Exit(e: Expr)(override val positionInfo: PositionInfo) extends Stmt
   case class Print(e: Expr)(override val positionInfo: PositionInfo) extends Stmt
   case class Println(e: Expr)(override val positionInfo: PositionInfo) extends Stmt
+  case class ExprStmt(e: Expr)(override val positionInfo: PositionInfo) extends Stmt
   case class IfElse(cond: Expr, thn: Stmt, els: Stmt)(override val positionInfo: PositionInfo) extends Stmt
   case class If(cond: Expr, thn: Stmt)(override val positionInfo: PositionInfo) extends Stmt
   case class Switch(selector: Expr, cases: List[SwitchCaseBody])(override val positionInfo: PositionInfo) extends Stmt
@@ -77,6 +78,7 @@ object Stmt{
   object Exit extends ParserBridgePos1[Expr, Exit]
   object Print extends ParserBridgePos1[Expr, Print]
   object Println extends ParserBridgePos1[Expr, Println]
+  object ExprStmt extends ParserBridgePos1[Expr, ExprStmt]
   object IfElse extends ParserBridgePos3[Expr, Stmt, Stmt, IfElse]
   object If extends ParserBridgePos2[Expr, Stmt, If]
   object Switch extends ParserBridgePos2[Expr, List[SwitchCaseBody], Switch]

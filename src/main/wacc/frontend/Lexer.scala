@@ -28,7 +28,8 @@ object lexer {
         ">", ">=", "<", "<=",
         "==", "!=", "&&", "||",
         "=", ";", ",", "(", ")", "[", "]",
-        "&", "|", "~"
+        "&", "|", "~",
+        "+=", "-=", "*=", "/=", "%="
     )
 
     // Mapping of escape characters used in char and string literals

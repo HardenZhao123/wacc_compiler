@@ -1,0 +1,45 @@
+# side-effecting expressions update lvalues and evaluate to the updated value
+
+# Output:
+# 7
+# 12
+# 10
+# 30
+# 7
+# 2
+# 4
+# 8
+# 11
+# 31
+# 10
+# 4.5
+# 3.5
+#
+
+# Program:
+
+begin
+  int x = 6;
+  println ++x;
+  println (x += 5);
+  println (x -= 2);
+  println (x *= 3);
+  println (x /= 4);
+  println (x %= 5);
+
+  int[] values = [3, 4];
+  println ++values[0];
+  println (values[1] *= 2);
+
+  pair(int, int) p = newpair(10, 20);
+  int first = ++fst p;
+  println first;
+  int second = (snd p += first);
+  println second;
+  println --fst p;
+
+  float f = 1.5;
+  println (f += 3);
+  float g = --f;
+  println g
+end
