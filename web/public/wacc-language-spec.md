@@ -2,7 +2,7 @@
 
 This document specifies the WACC language accepted by this compiler. It is written in the style of a language reference: syntax is described with grammar productions, and semantic restrictions are stated as compile-time or run-time rules.
 
-The specification is based on the current implementation in `src/main/wacc/frontend` and the valid programs in `examples/valid`. In addition to the core WACC language, this compiler supports `float`, bitwise operators, `for`, `do-while`, `switch`, exceptions, simple macros, and function overloading.
+The specification is based on the current implementation in `src/main/wacc/frontend` and the valid programs in `examples/valid`. In addition to the core WACC language, this compiler supports `float`, bitwise operators, side-effecting expressions, `for`, `do-while`, `switch`, exceptions, simple macros, and function overloading.
 
 ## 1. Notation
 
@@ -61,6 +61,7 @@ The following operator and separator tokens are recognised:
 == != && ||
 = ; , ( ) [ ]
 & | ~
+++ -- += -= *= /= %=
 ```
 
 ### 2.4 Identifiers
@@ -318,11 +319,21 @@ Exception
 ### 5.1 Expression Grammar
 
 ```text
-Expression ::= PrefixOperator Expression
+Expression ::= SideEffectingExpression
+             | PrefixOperator Expression
              | Expression BinaryOperator Expression
              | Atom
 
 PrefixOperator ::= "!" | "-" | "len" | "ord" | "chr" | "~"
+
+SideEffectingExpression ::= UnarySideEffectingExpression
+                          | CompoundAssignmentExpression
+
+UnarySideEffectingExpression ::= ("++" | "--") LValue
+
+CompoundAssignmentExpression ::= LValue CompoundAssignmentOperator Expression
+
+CompoundAssignmentOperator ::= "+=" | "-=" | "*=" | "/=" | "%="
 
 Atom ::= IntegerLiteral
        | BooleanLiteral
@@ -345,7 +356,7 @@ Operators are listed from highest precedence to lowest precedence.
 
 | Level | Operators | Associativity | Operand rule | Result |
 | ---: | --- | --- | --- | --- |
-| 1 | `!`, `-`, `len`, `ord`, `chr`, `~` | prefix | see unary rules | see unary rules |
+| 1 | `!`, `-`, `len`, `ord`, `chr`, `~`, `++`, `--` | prefix | see unary and side-effecting rules | see unary and side-effecting rules |
 | 2 | `*`, `/`, `%` | left | numeric, but `%` requires `int` | numeric or `int` |
 | 3 | `+`, `-` | left | `int` or `float` | `int` or `float` |
 | 4 | `>`, `>=`, `<`, `<=` | non-associative | same ordered type: `int`, `char`, or `float` | `bool` |
@@ -354,6 +365,8 @@ Operators are listed from highest precedence to lowest precedence.
 | 7 | `|` | left | `int` | `int` |
 | 8 | `&&` | right | `bool` | `bool` |
 | 9 | `||` | right | `bool` | `bool` |
+
+Compound assignment expressions have lower precedence than the binary operators above. The left-hand side must be an l-value, and the right-hand side is a full expression.
 
 ### 5.3 Unary Operators
 
@@ -375,6 +388,36 @@ chr e    e must be int; result is char
 `%` accepts only `int` operands.
 
 Integer division and modulo by zero are checked at run time.
+
+### 5.4.1 Side-effecting Expressions
+
+Side-effecting expressions update an l-value and evaluate to the updated value.
+
+```text
+++x       x must be an int or float l-value; result is the updated value
+--x       x must be an int or float l-value; result is the updated value
+x += e    x must be an int or float l-value; result is the updated value
+x -= e    x must be an int or float l-value; result is the updated value
+x *= e    x must be an int or float l-value; result is the updated value
+x /= e    x must be an int or float l-value; result is the updated value
+x %= e    x and e must have type int; result is the updated value
+```
+
+For `+=`, `-=`, `*=`, and `/=`, an `int` l-value requires an `int` right-hand side. A `float` l-value accepts `int` or `float` right-hand sides; integer values are converted to `float`.
+
+Examples:
+
+```wacc
+int x = 1;
+println ++x;
+println (x += 3);
+
+int[] a = [10, 20];
+println (a[0] -= 4);
+
+pair(int, int) p = newpair(5, 6);
+println ++fst p
+```
 
 ### 5.5 Boolean Operators
 
@@ -474,6 +517,7 @@ Statement ::= StatementAtom (";" StatementAtom)*
 StatementAtom ::= "skip"
                 | Type Identifier "=" RValue
                 | LValue "=" RValue
+                | SideEffectingExpression
                 | "read" LValue
                 | "free" Expression
                 | "return" Expression
@@ -515,6 +559,16 @@ Assignment ::= LValue "=" RValue
 A compile-time error occurs if the right-hand side is not compatible with the left-hand side type.
 
 Pair-element assignments whose element types are completely unknown are rejected unless the type of at least one side is known or specified.
+
+Side-effecting expressions may also be used as standalone statements:
+
+```wacc
+x += 1;
+++a[0];
+--fst p
+```
+
+Ordinary non-side-effecting expressions are not standalone statements.
 
 ### 7.4 Read Statements
 
@@ -948,6 +1002,7 @@ The compiler provides print helpers for:
 This section records behaviour that follows from this compiler implementation.
 
 - `call`, `newpair`, array literals, and pair-element r-values are not general expressions; they are r-values used in declarations and assignments.
+- Side-effecting expressions are general expressions, and they are the only expressions accepted as standalone expression statements.
 - `free` is parsed as accepting an expression and type-checked for array or pair type, but the valid examples and backend lowering use direct array or pair variables.
 - `switch` bodies fall through like C/Java switch bodies; `Break` is required to stop fall-through.
 - `switch` does not introduce a new variable scope.
