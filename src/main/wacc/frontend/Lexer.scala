@@ -9,7 +9,7 @@ object lexer {
 
     // Set of  keywords that cannot be used as identifiers
     // and are recognised directly by the lexer.
-    private final val hardKeyWords: Set[String] = Set(
+    final val hardKeywords: Set[String] = Set(
         "int", "char", "float", "string", "bool", "pair", "null",
         "true", "false", "begin", "end", "is", "skip", "switch", "case",
         "read", "free", "return", "throw", "exit", "print", "println",
@@ -23,11 +23,11 @@ object lexer {
 
     // Set of operators and symbols that are tokenised atomically
     // and not parsed as identifiers.
-    private final val hardOperators: Set[String] = Set(
+    final val hardOperators: Set[String] = Set(
         "!", "-", "*", "/", "%", "+",
         ">", ">=", "<", "<=",
         "==", "!=", "&&", "||",
-        "=", ";", ",", "(", ")", "[", "]",
+        "=", ";", ",", ":", "(", ")", "[", "]",
         "&", "|", "~",
         "+=", "-=", "*=", "/=", "%="
     )
@@ -68,7 +68,7 @@ object lexer {
 
         // Keyword and operator configuration.
         symbolDesc = SymbolDesc.plain.copy(
-            hardKeywords = hardKeyWords,
+            hardKeywords = hardKeywords,
             hardOperators = hardOperators
         ),
 

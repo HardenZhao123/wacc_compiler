@@ -59,7 +59,7 @@ object Main {
              |${"-" * 30}
              |""".stripMargin
         )
-        System.err.println(s"${SyntaxError.format(path, input, parseErrs)}\n")
+        System.err.println(s"${SyntaxError.format(path, parseErrs)}\n")
         println(
           s"""${"-" * 30}
              |Finished with exit code: ${ExitCode.SyntaxError}""".stripMargin

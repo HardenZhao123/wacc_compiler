@@ -45,6 +45,23 @@ trait Snippet {
     }
   }
 
+  final def renderContextSnippet(
+                                  line: String,
+                                  linesBefore: Seq[String],
+                                  linesAfter: Seq[String],
+                                  errorPointsAt: Int,
+                                  errorWidth: Int
+                                ): Seq[String] = {
+    val pad = " " * math.max(0, errorPointsAt)
+    val carets = "^" * math.max(1, errorWidth)
+
+    Seq("|") ++
+      linesBefore.map(l => s"|$l") ++
+      Seq(s"|$line", s"|$pad$carets") ++
+      linesAfter.map(l => s"|$l") ++
+      Seq("|")
+  }
+
   // render snippet, highlight the given position
   def renderSnippet(
                              input: String,
@@ -57,21 +74,17 @@ trait Snippet {
 
     val ctx = contextLines(input, row, linesBefore, linesAfter)
 
-    val snippetLines =
-      ctx.flatMap { case (r, line) =>
-        if (r == row) {
-          val pad = " " * math.max(0, col - 1)
-          val carets = "^" * caretLen(line, col)
-          Seq(
-            s"|$line",
-            s"|$pad$carets"
-          )
-        } else {
-          Seq(s"|$line")
-        }
-      }
+    val before = ctx.collect { case (r, line) if r < row => line }
+    val current = ctx.collectFirst { case (r, line) if r == row => line }.getOrElse("")
+    val after = ctx.collect { case (r, line) if r > row => line }
 
-    ("|" +: snippetLines :+ "|").mkString("\n")
+    renderContextSnippet(
+      current,
+      before,
+      after,
+      errorPointsAt = col - 1,
+      errorWidth = caretLen(current, col)
+    ).mkString("\n")
   }
 }
 
