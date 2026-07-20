@@ -44,12 +44,10 @@ true false begin end is skip switch case default
 read free return throw exit print println
 if then else fi while do done for
 newpair fst snd call len ord chr
-try catch Break Continue
+try catch break continue
 ArrayOutOfBoundsException BadCharException ArithmeticException
 IntegerOverflowException NullDereferenceException Exception
 ```
-
-`Break` and `Continue` are capitalised keywords. Lowercase `break` and `continue` are not statement keywords in this compiler.
 
 ### 2.3 Operators and Separators
 
@@ -189,7 +187,7 @@ The return checker treats these constructs as returning:
 - `throw E(e)`
 - `exit e`
 - `if e then s1 else s2 fi`, only if both branches return
-- `switch`, only if it has a `default` and every possible case entry returns, accounting for fall-through and `Break`
+- `switch`, only if it has a `default` and every possible case entry returns, accounting for fall-through and `break`
 - `try ... catch ... done`, only if the try body and every catch body return
 - `begin s end`, if `s` returns
 - a statement sequence, if its last reachable statement returns
@@ -532,8 +530,8 @@ StatementAtom ::= "skip"
                 | DoWhileStatement
                 | SwitchStatement
                 | TryCatchStatement
-                | "Break"
-                | "Continue"
+                | "break"
+                | "continue"
 ```
 
 ### 7.2 Declaration Statements
@@ -666,7 +664,7 @@ WhileStatement ::= "while" Expression "do" Statement "done"
 
 The condition must have type `bool`.
 
-The body is a nested scope. `Break` and `Continue` are valid inside the body. `Continue` jumps to the condition check.
+The body is a nested scope. `break` and `continue` are valid inside the body. `continue` jumps to the condition check.
 
 ### 7.13 For Statements
 
@@ -678,7 +676,7 @@ The middle expression must have type `bool`.
 
 The initializer, condition, update statement, and body share the same loop scope. Variables declared by the initializer are visible in the condition, update statement, and body, but not after the loop.
 
-`Break` exits the loop. `Continue` jumps to the update statement before rechecking the condition.
+`break` exits the loop. `continue` jumps to the update statement before rechecking the condition.
 
 Example:
 
@@ -696,18 +694,18 @@ DoWhileStatement ::= "do" Statement "while" Expression
 
 The body executes before the condition is checked. The condition must have type `bool`.
 
-The body is a nested scope. `Continue` jumps to the trailing condition check.
+The body is a nested scope. `continue` jumps to the trailing condition check.
 
-### 7.15 Break and Continue
+### 7.15 break and continue
 
 ```text
-BreakStatement    ::= "Break"
-ContinueStatement ::= "Continue"
+BreakStatement    ::= "break"
+ContinueStatement ::= "continue"
 ```
 
-`Break` is valid inside loops and `switch` statements.
+`break` is valid inside loops and `switch` statements.
 
-`Continue` is valid only inside loops.
+`continue` is valid only inside loops.
 
 ### 7.16 Switch Statements
 
@@ -729,7 +727,7 @@ Several labels may share the same body:
 switch (grade)
   case 'A': case 'B': case 'C':
     println "passing";
-    Break
+    break
   default:
     println "unknown"
 end
@@ -737,7 +735,7 @@ end
 
 Execution starts at the first matching label. If no case label matches, execution starts at the first `default` label, if one exists. If no label matches and there is no `default`, the switch does nothing.
 
-Case bodies are contiguous. Reaching the end of a case body falls through to the next case body. Use `Break` to leave the switch.
+Case bodies are contiguous. Reaching the end of a case body falls through to the next case body. Use `break` to leave the switch.
 
 ### 7.17 Try-catch Statements
 
@@ -1004,11 +1002,11 @@ This section records behaviour that follows from this compiler implementation.
 - `call`, `newpair`, array literals, and pair-element r-values are not general expressions; they are r-values used in declarations and assignments.
 - Side-effecting expressions are general expressions, and they are the only expressions accepted as standalone expression statements.
 - `free` is parsed as accepting an expression and type-checked for array or pair type, but the valid examples and backend lowering use direct array or pair variables.
-- `switch` bodies fall through like C/Java switch bodies; `Break` is required to stop fall-through.
+- `switch` bodies fall through like C/Java switch bodies; `break` is required to stop fall-through.
 - `switch` does not introduce a new variable scope.
 - `do-while` has no closing `done`.
-- `for` uses `Continue` to jump to the update statement.
-- `do-while` uses `Continue` to jump to the trailing condition check.
+- `for` uses `continue` to jump to the update statement.
+- `do-while` uses `continue` to jump to the trailing condition check.
 - Function overloads are lowered by name mangling, so source-level function names can overlap with C library names.
 
 ## 14. Minimal Complete Example
@@ -1029,7 +1027,7 @@ begin
   switch (best)
     case 7:
       println "ok";
-      Break
+      break
     default:
       println "unexpected"
   end
