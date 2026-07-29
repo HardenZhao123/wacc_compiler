@@ -10,6 +10,7 @@ import org.scalatest.time.Seconds
 import org.scalatest.concurrent.TimeLimits
 
 import java.io.{ByteArrayOutputStream, PrintStream}
+import wacc.Main.TargetArch
 
 object BackendRunner {
 
@@ -115,9 +116,18 @@ object BackendRunner {
 
   final case class CmdResult(exitCode: Int, out: String, err: String)
 
-  // Wrap external commands with GNU timeout to avoid hung processes blocking CI runners.
+  private lazy val timeoutBinary: Option[String] =
+    Seq("timeout", "gtimeout").find { bin =>
+      Try(os.proc(bin, "--version").call(stdout = os.Pipe, stderr = os.Pipe, check = false).exitCode == 0)
+        .getOrElse(false)
+    }
+
+  // Wrap external commands with GNU timeout when available to avoid hung processes blocking CI runners.
   private def withTimeout(cmd: Seq[String], timeoutSec: Int, killAfterSec: Int = 1): Seq[String] =
-    Seq("timeout", "-k", s"${killAfterSec}s", s"${timeoutSec}s") ++ cmd
+    timeoutBinary match {
+      case Some(bin) => Seq(bin, "-k", s"${killAfterSec}s", s"${timeoutSec}s") ++ cmd
+      case None      => cmd
+    }
 
   private def runCmd(
                       cwd: os.Path,
@@ -147,7 +157,7 @@ object BackendRunner {
     CmdResult(res.exitCode, outBuf.result(), errBuf.result())
   }
 
-  def runCompile(file: String, isAArch64: Boolean, peephole: Boolean): CmdResult = {
+  def runCompile(file: String, targetArch: TargetArch, peephole: Boolean): CmdResult = {
     val repoRoot = os.pwd
 
     val prevOut = System.out
@@ -166,7 +176,7 @@ object BackendRunner {
       System.setProperty("user.dir", repoRoot.toIO.getAbsolutePath)
 
       val absFile = os.Path(file, base = repoRoot).toIO.getAbsolutePath
-      val code = wacc.Main.compileFile(absFile, isAArch64, peephole)
+      val code = wacc.Main.compileFile(absFile, targetArch, peephole)
 
       CmdResult(code, outBytes.toString("UTF-8"), errBytes.toString("UTF-8"))
     } finally {
@@ -224,10 +234,33 @@ object BackendRunner {
     )
   }
 
-  def runValidBackend(file: os.Path, isAArch64: Boolean, peephole: Boolean): (Int, CmdResult, Spec) = {
+  def assembleAndRunX86(asmFile: os.Path, stdin: Option[String]): CmdResult = {
+    val repoRoot = os.pwd
+    val exe = repoRoot / s"${asmFile.baseName}.out"
+    if (os.exists(exe)) os.remove(exe)
+
+    val gcc = Seq(
+      sys.env.getOrElse("WACC_X86_GCC", "gcc"),
+      "-o", exe.toString,
+      "-z", "noexecstack",
+      "-no-pie",
+      asmFile.toString
+    )
+    val gccRes = runCmd(repoRoot, gcc, timeoutSec = 60)
+    if (gccRes.exitCode != 0) return gccRes
+
+    runCmd(
+      repoRoot,
+      Seq(exe.toString),
+      timeoutSec = 20,
+      stdin = stdin
+    )
+  }
+
+  def runValidBackend(file: os.Path, targetArch: TargetArch, peephole: Boolean): (Int, CmdResult, Spec) = {
     val repoRoot = os.pwd
 
-    val comp = runCompile(file.toString, isAArch64, peephole)
+    val comp = runCompile(file.toString, targetArch, peephole)
     if (comp.exitCode != ExitCode.Success) return (comp.exitCode, comp, Spec(None, None, None))
 
     val asmOut = repoRoot / s"${file.baseName}.s"
@@ -242,8 +275,11 @@ object BackendRunner {
       if (t.isEmpty) "" else t + "\n"
     }
 
-    val runRes = if isAArch64 then assembleAndRunAArch64(asmOut, stdin)
-                 else assembleAndRunARM32(asmOut, stdin)
+    val runRes = targetArch match {
+      case TargetArch.AArch64 => assembleAndRunAArch64(asmOut, stdin)
+      case TargetArch.Arm32   => assembleAndRunARM32(asmOut, stdin)
+      case TargetArch.X86     => assembleAndRunX86(asmOut, stdin)
+    }
     (comp.exitCode, runRes, spec)
   }
 }
@@ -253,7 +289,7 @@ trait BackendIntegrationSpec
 
   import BackendRunner.*
 
-  def isAArch64: Boolean = true
+  def targetArch: TargetArch = TargetArch.AArch64
   def peephole: Boolean = true
   def testDir: os.Path
   def description: String
@@ -291,7 +327,7 @@ trait BackendIntegrationSpec
               // Avoid pollution from valid tests: invalid programs should not produce assembly.
               if (os.exists(asmOut)) os.remove(asmOut)
 
-              val comp = runCompile(file.toString, isAArch64, peephole)
+              val comp = runCompile(file.toString, targetArch, peephole)
 
               withClue(
                 s"""
@@ -314,7 +350,7 @@ trait BackendIntegrationSpec
 
             } else {
               // valid: compile -> asm -> gcc -> qemu; compare runtime behaviour
-              val (compileCode, runRes, spec) = runValidBackend(file, isAArch64, peephole)
+              val (compileCode, runRes, spec) = runValidBackend(file, targetArch, peephole)
               compileCode shouldBe expectedExitCode
 
               if (runRes.exitCode == 124 || runRes.exitCode == 137) {
@@ -392,18 +428,19 @@ final class AArch64BackendValidProgramsIT extends BackendIntegrationSpec {
                   "function",
                   "pairs",
                   "runtimeErr",
+                  "advanced",
+                  "switch",
                   "exception"))
   generateTests("backend-valid")
 }
 
 final class ARM32BackendValidProgramsIT extends BackendIntegrationSpec {
-  override val isAArch64: Boolean = false
+  override val targetArch: TargetArch = TargetArch.Arm32
   override val testDir = os.pwd / "examples" / "valid"
   override val description = "Backend: Valid WACC programs (arm32)"
   override val expectedExitCode = 0
 
-  override val allowedPackages: Option[Set[String]] =
-   Some(Set("basic",
+  override val allowedPackages: Option[Set[String]] = Some(Set("basic",
     "sequence",
     "IO",
     "variables",
@@ -417,6 +454,34 @@ final class ARM32BackendValidProgramsIT extends BackendIntegrationSpec {
     "function",
     "pairs",
     "runtimeErr",
+    "advanced",
+    "switch",
+    "exception"))
+  generateTests("backend-valid")
+}
+
+final class X86BackendValidProgramsIT extends BackendIntegrationSpec {
+  override val targetArch: TargetArch = TargetArch.X86
+  override val testDir = os.pwd / "examples" / "valid"
+  override val description = "Backend: Valid WACC programs (x86-64)"
+  override val expectedExitCode = 0
+
+  override val allowedPackages: Option[Set[String]] = Some(Set("basic",
+    "sequence",
+    "IO",
+    "variables",
+    "expressions",
+    "array",
+    "if",
+    "while",
+    "for",
+    "do-while",
+    "scope",
+    "function",
+    "pairs",
+    "runtimeErr",
+    "advanced",
+    "switch",
     "exception"))
   generateTests("backend-valid")
 }
