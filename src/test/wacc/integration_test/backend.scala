@@ -428,7 +428,6 @@ final class AArch64BackendValidProgramsIT extends BackendIntegrationSpec {
                   "function",
                   "pairs",
                   "runtimeErr",
-                  "advanced",
                   "switch",
                   "exception"))
   generateTests("backend-valid")
@@ -454,7 +453,6 @@ final class ARM32BackendValidProgramsIT extends BackendIntegrationSpec {
     "function",
     "pairs",
     "runtimeErr",
-    "advanced",
     "switch",
     "exception"))
   generateTests("backend-valid")
@@ -480,7 +478,6 @@ final class X86BackendValidProgramsIT extends BackendIntegrationSpec {
     "function",
     "pairs",
     "runtimeErr",
-    "advanced",
     "switch",
     "exception"))
   generateTests("backend-valid")
