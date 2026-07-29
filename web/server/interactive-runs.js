@@ -242,12 +242,15 @@ class InteractiveRunStore {
         };
       }
 
-      const emulatorArgs = [];
-      if (linked.tools.sysroot) emulatorArgs.push("-L", linked.tools.sysroot);
-      emulatorArgs.push(linked.binaryPath);
+      const command = linked.config.emulator || linked.binaryPath;
+      const args = [];
+      if (linked.config.emulator) {
+        if (linked.tools.sysroot) args.push("-L", linked.tools.sysroot);
+        args.push(linked.binaryPath);
+      }
 
       const id = crypto.randomUUID();
-      const child = spawn(linked.config.emulator, emulatorArgs, {
+      const child = spawn(command, args, {
         cwd: build.tempDir,
         env: process.env,
         stdio: ["pipe", "pipe", "pipe"],

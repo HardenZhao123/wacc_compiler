@@ -303,6 +303,61 @@ process.stdin.on("data", (chunk) => {
   assert.match(finished.execution.stdout, /done/);
 });
 
+test("starts native x86-64 interactive runs without an emulator", async (t) => {
+  const fakeDir = await fs.mkdtemp(path.join(os.tmpdir(), "wacc-x86-run-test-"));
+  const fakeCompiler = path.join(fakeDir, "fake-compiler.js");
+  const fakeLinker = path.join(fakeDir, "fake-linker.js");
+
+  await fs.writeFile(fakeCompiler, `#!/usr/bin/env node
+const fs = require("node:fs");
+const path = require("node:path");
+fs.writeFileSync(path.join(process.cwd(), "program.s"), ".text\\n.global main\\n");
+`, { mode: 0o755 });
+  await fs.writeFile(fakeLinker, `#!/usr/bin/env node
+const fs = require("node:fs");
+const outputIndex = process.argv.indexOf("-o") + 1;
+const outputPath = process.argv[outputIndex];
+fs.writeFileSync(outputPath, '#!/usr/bin/env node\\nprocess.stdout.write("x86-native> ");\\nsetInterval(() => {}, 1000);\\n');
+fs.chmodSync(outputPath, 0o755);
+`, { mode: 0o755 });
+
+  const previous = process.env.WACC_X86_GCC;
+  process.env.WACC_X86_GCC = fakeLinker;
+
+  const server = createServer({
+    compilerCommand: { command: fakeCompiler, prefixArgs: [] },
+    finishedRunRetentionMs: 5_000,
+  });
+  await new Promise((resolve) => server.listen(0, "127.0.0.1", resolve));
+
+  t.after(async () => {
+    await new Promise((resolve) => server.close(resolve));
+    restoreEnv("WACC_X86_GCC", previous);
+    await fs.rm(fakeDir, { recursive: true, force: true });
+  });
+
+  const address = server.address();
+  const started = await request(address.port, "POST", "/api/runs", {
+    source: "begin\n  println \"Hello\"\nend",
+    architecture: "x86-64",
+    optimise: false,
+    run: true,
+    stdin: "",
+  });
+
+  assert.equal(started.statusCode, 200);
+  const startedResult = JSON.parse(started.body);
+  assert.equal(startedResult.ok, true);
+  assert.equal(startedResult.phase, "running");
+  assert.equal(startedResult.execution.running, true);
+  assert.ok(startedResult.sessionId);
+
+  const prompt = await waitForRun(address.port, startedResult.sessionId, (result) => (
+    result.execution.running && result.execution.stdout.includes("x86-native> ")
+  ));
+  assert.match(prompt.execution.stdout, /x86-native> /);
+});
+
 function request(port, method, pathname, body) {
   return new Promise((resolve, reject) => {
     const encoded = body === undefined ? null : JSON.stringify(body);
