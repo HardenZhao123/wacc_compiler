@@ -53,6 +53,14 @@ function runnerConfig(architecture) {
       sysroot: process.env.WACC_AARCH64_SYSROOT || "/usr/aarch64-linux-gnu/",
     };
   }
+  if (architecture === "x86" || architecture === "x86_64" || architecture === "x86-64") {
+    return {
+      compiler: process.env.WACC_X86_GCC || "gcc",
+      compilerArgs: ["-z", "noexecstack", "-no-pie"],
+      emulator: null,
+      sysroot: null,
+    };
+  }
   return {
     compiler: process.env.WACC_ARM32_GCC || "arm-linux-gnueabi-gcc",
     compilerArgs: ["-z", "noexecstack", "-march=armv6"],
@@ -64,17 +72,19 @@ function runnerConfig(architecture) {
 function toolchainStatus(architecture) {
   const config = runnerConfig(architecture);
   const compiler = findExecutable(config.compiler);
-  const emulator = findExecutable(config.emulator);
+  const emulator = config.emulator ? findExecutable(config.emulator) : null;
   const sysroot = config.sysroot && fs.existsSync(config.sysroot) ? config.sysroot : null;
   const missing = [];
   if (!compiler) missing.push(config.compiler);
-  if (!emulator) missing.push(config.emulator);
-  if (!sysroot) {
-    missing.push(config.sysroot);
-  } else {
-    for (const objectFile of ["Scrt1.o", "crti.o"]) {
-      const objectPath = path.join(sysroot, "lib", objectFile);
-      if (!fs.existsSync(objectPath)) missing.push(objectPath);
+  if (config.emulator && !emulator) missing.push(config.emulator);
+  if (config.sysroot) {
+    if (!sysroot) {
+      missing.push(config.sysroot);
+    } else {
+      for (const objectFile of ["Scrt1.o", "crti.o"]) {
+        const objectPath = path.join(sysroot, "lib", objectFile);
+        if (!fs.existsSync(objectPath)) missing.push(objectPath);
+      }
     }
   }
 
@@ -93,9 +103,10 @@ function serviceStatus(options = {}) {
   const architectures = {
     aarch64: toolchainStatus("aarch64"),
     arm32: toolchainStatus("arm32"),
+    "x86-64": toolchainStatus("x86-64"),
   };
   return {
-    ready: compilerAvailable && architectures.aarch64.available && architectures.arm32.available,
+    ready: compilerAvailable && Object.values(architectures).every((entry) => entry.available),
     compiler: {
       available: compilerAvailable,
       command: path.basename(invocation.command),

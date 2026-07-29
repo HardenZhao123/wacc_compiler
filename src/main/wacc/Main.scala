@@ -15,9 +15,19 @@ import wacc.backend.midir.*
 import wacc.backend.AArch64.codeGen.*
 import wacc.backend.BackendCommon.BackendConstant.*
 import wacc.backend.Arm32.codeGen.*
+import wacc.backend.X86.codeGen.{X86Formatter, X86Generator}
 
 object Main {
-  def compileFile(path: String, isAArch64: Boolean, peephole: Boolean): Int = {
+  enum TargetArch {
+    case AArch64, Arm32, X86
+  }
+
+  import TargetArch.*
+
+  def compileFile(path: String, isAArch64: Boolean, peephole: Boolean): Int =
+    compileFile(path, if isAArch64 then AArch64 else Arm32, peephole)
+
+  def compileFile(path: String, targetArch: TargetArch, peephole: Boolean): Int = {
     println("========== Frontend ==========")
 
     var semanticErr = false
@@ -124,48 +134,47 @@ object Main {
 
         println("Starting gir generation... finished!")
 
-        // Chose word size based on architecture
-        val wordSize = if isAArch64 then A64_WORD_SIZE
-                       else A32_WORD_SIZE
+        val wordSize = targetArch match {
+          case AArch64 => A64_WORD_SIZE
+          case Arm32   => A32_WORD_SIZE
+          case X86     => wacc.backend.X86.X86Constants.SLOT_SIZE
+        }
         val tac = LowerToTAC.fromTypedProgram(typedAst, wordSize)
 
-        println("Starting arm translation... finished!")
+        println(s"Starting ${archName(targetArch)} translation... finished!")
 
-        // Generate AArch64 assembly
-        if isAArch64 then
-          val a64Instrs = A64Generator.genA64Program(tac)
-          val finalInstrs =
-            if (peephole) then
-              println("Start peephole optimisation ... finished!")
-              A64PeepholeOptimiser.optimise(a64Instrs)
-            else a64Instrs
+        val fileName = Paths.get(path).getFileName.toString.stripSuffix(".wacc")
+        val filePath = os.pwd / s"${fileName}.s"
+        val outputStream = new FileOutputStream(filePath.toIO)
+        try {
+          targetArch match {
+            case AArch64 =>
+              val a64Instrs = A64Generator.genA64Program(tac)
+              val finalInstrs =
+                if (peephole) then
+                  println("Start peephole optimisation ... finished!")
+                  A64PeepholeOptimiser.optimise(a64Instrs)
+                else a64Instrs
+              A64Formatter.writeAssembly(finalInstrs, outputStream)
 
-          val fileName = Paths.get(path).getFileName.toString.stripSuffix(".wacc")
-          val filePath = os.pwd / s"${fileName}.s"
-          val outputStream = new FileOutputStream(filePath.toIO)
-          try
-            A64Formatter.writeAssembly(finalInstrs, outputStream)
-          finally
-            outputStream.close()
+            case Arm32 =>
+              val a32Instrs = A32Generator.genA32Program(tac)
+              val finalInstrs =
+                if (peephole) then
+                  println("Start peephole optimisation ... finished!")
+                  A32PeepholeOptimiser.optimise(a32Instrs)
+                else a32Instrs
+              A32Formatter.writeAssembly(finalInstrs, outputStream)
 
-        // Generate ARM32 assembly
-        else
-          val a32Instrs = A32Generator.genA32Program(tac)
-          val finalInstrs =
-            if (peephole) then
-              println("Start peephole optimisation ... finished!")
-              A32PeepholeOptimiser.optimise(a32Instrs)
-            else a32Instrs
+            case X86 =>
+              val x86Instrs = X86Generator.genX86Program(tac)
+              X86Formatter.writeAssembly(x86Instrs, outputStream)
+          }
+        } finally {
+          outputStream.close()
+        }
 
-          val fileName = Paths.get(path).getFileName.toString.stripSuffix(".wacc")
-          val filePath = os.pwd / s"${fileName}.s"
-          val outputStream = new FileOutputStream(filePath.toIO)
-          try
-            A32Formatter.writeAssembly(finalInstrs, outputStream)
-          finally
-            outputStream.close()
-
-        println("Starting arm printing... finished!")
+        println(s"Starting ${archName(targetArch)} printing... finished!")
 
         println(
           s"""${"-" * 30}
@@ -176,13 +185,13 @@ object Main {
     }
   }
 
-  // Use: ./compile <filename>.wacc [--architecture { aarch64 | arm32 }] [--peephole-optim] [--no-peephole]
+  // Use: ./compile <filename>.wacc [--architecture { aarch64 | arm32 | x86-64 }] [--peephole-optim] [--no-peephole]
   // [ ... ] means optional
   def main(args: Array[String]): Unit = {
     if (args.isEmpty) {
       println("========== Frontend ==========")
       System.err.println(
-        "usage: compile <file.wacc> [--architecture aarch64|arm32] [--peephole-optim]"
+        "usage: compile <file.wacc> [--architecture aarch64|arm32|x86-64] [--peephole-optim]"
       )
       println(s"Finished with exit code: ${ExitCode.UsageError}")
       sys.exit(ExitCode.UsageError)
@@ -191,8 +200,8 @@ object Main {
     val file = args(0)
 
     // defaults
-    var isAArch64 = false        // default: arm32
-    var peephole = true          // default: enabled
+    var targetArch = Arm32      // default: arm32
+    var peephole = true         // default: enabled
 
     var i = 1
     while (i < args.length) {
@@ -205,10 +214,11 @@ object Main {
           }
 
           args(i + 1) match {
-            case "aarch64" => isAArch64 = true
-            case "arm32"   => isAArch64 = false
+            case "aarch64" => targetArch = AArch64
+            case "arm32"   => targetArch = Arm32
+            case "x86" | "x86-64" | "x86_64" => targetArch = X86
             case _ =>
-              System.err.println("Invalid architecture (use aarch64 or arm32)")
+              System.err.println("Invalid architecture (use aarch64, arm32, or x86-64)")
               sys.exit(ExitCode.UsageError)
           }
 
@@ -228,7 +238,13 @@ object Main {
       i += 1
     }
 
-    val code = compileFile(file, isAArch64, peephole)
+    val code = compileFile(file, targetArch, peephole)
     sys.exit(code)
+  }
+
+  private def archName(targetArch: TargetArch): String = targetArch match {
+    case TargetArch.AArch64 => "aarch64"
+    case TargetArch.Arm32   => "arm32"
+    case TargetArch.X86     => "x86-64"
   }
 }

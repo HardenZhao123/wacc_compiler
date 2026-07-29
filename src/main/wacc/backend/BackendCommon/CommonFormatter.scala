@@ -38,6 +38,8 @@ abstract class CommonFormatter[InstrType, RegType <: Register] {
       else base
     case WordData(label, value) =>
       s"${label.label}:\n${indent}$ASM_DIRECTIVE_WORD $value"
+    case QuadData(label, value) =>
+      s"${label.label}:\n${indent}$ASM_DIRECTIVE_QUAD $value"
     case DataSeg(items) =>
       s"$ASM_DIRECTIVE_DATA\n" + items.map(formatAsmEntity).mkString("\n")
   }

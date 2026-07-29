@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="description" content="Compile and run WACC programs for AArch64 and ARM32">
+    <meta name="description" content="Compile and run WACC programs for AArch64, ARM32, and x86-64">
     <meta name="theme-color" content="#09111f">
     <title>WACC Compiler Studio</title>
     <link rel="icon" href="/icon.svg" type="image/svg+xml">
@@ -34,7 +34,7 @@
           <p class="eyebrow">Interactive compiler</p>
           <h1>Write WACC. Inspect assembly. Run it.</h1>
         </div>
-        <p class="hero-copy">Target AArch64 or ARM32, compare optimised output, and execute programs from any modern browser.</p>
+        <p class="hero-copy">Target AArch64, ARM32, or x86-64, compare optimised output, and execute programs from any modern browser.</p>
       </section>
 
       <section class="toolbar card" aria-label="Compiler options">
@@ -61,6 +61,10 @@
             <label>
               <input type="radio" name="architecture" value="arm32">
               <span>ARM32</span>
+            </label>
+            <label>
+              <input type="radio" name="architecture" value="x86-64">
+              <span>x86-64</span>
             </label>
           </div>
         </fieldset>

@@ -22,8 +22,13 @@ test("validates architecture and applies optimisation defaults", () => {
   assert.equal(request.optimise, true);
   assert.equal(request.run, false);
   assert.equal(request.stdin, "");
+  const x86Request = validateCompileRequest({
+    source: "begin\n  skip\nend",
+    architecture: "x86",
+  });
+  assert.equal(x86Request.architecture, "x86-64");
   assert.throws(
-    () => validateCompileRequest({ source: "begin end", architecture: "x86" }),
+    () => validateCompileRequest({ source: "begin end", architecture: "mips" }),
     /Architecture must be/,
   );
 });
@@ -150,6 +155,7 @@ process.stdin.on("end", () => console.log("Hello from emulated WACC"));
     arm32Gcc: process.env.WACC_ARM32_GCC,
     arm32Qemu: process.env.WACC_ARM32_QEMU,
     arm32Sysroot: process.env.WACC_ARM32_SYSROOT,
+    x86Gcc: process.env.WACC_X86_GCC,
   };
   process.env.WACC_AARCH64_GCC = fakeLinker;
   process.env.WACC_AARCH64_QEMU = fakeQemu;
@@ -157,6 +163,7 @@ process.stdin.on("end", () => console.log("Hello from emulated WACC"));
   process.env.WACC_ARM32_GCC = fakeLinker;
   process.env.WACC_ARM32_QEMU = fakeQemu;
   process.env.WACC_ARM32_SYSROOT = fakeDir;
+  process.env.WACC_X86_GCC = fakeLinker;
 
   t.after(async () => {
     restoreEnv("WACC_AARCH64_GCC", previous.gcc);
@@ -165,6 +172,7 @@ process.stdin.on("end", () => console.log("Hello from emulated WACC"));
     restoreEnv("WACC_ARM32_GCC", previous.arm32Gcc);
     restoreEnv("WACC_ARM32_QEMU", previous.arm32Qemu);
     restoreEnv("WACC_ARM32_SYSROOT", previous.arm32Sysroot);
+    restoreEnv("WACC_X86_GCC", previous.x86Gcc);
     await fs.rm(fakeDir, { recursive: true, force: true });
   });
 

@@ -17,6 +17,7 @@ FROM node:22-bookworm-slim
 
 RUN apt-get update \
     && apt-get install -y --no-install-recommends \
+      gcc \
       gcc-aarch64-linux-gnu \
       gcc-arm-linux-gnueabi \
       libc6-dev-arm64-cross \
@@ -29,7 +30,9 @@ RUN printf 'int main(void) { return 0; }\n' > /tmp/toolchain-smoke.c \
     && qemu-aarch64 -L /usr/aarch64-linux-gnu /tmp/toolchain-aarch64 \
     && arm-linux-gnueabi-gcc /tmp/toolchain-smoke.c -o /tmp/toolchain-arm32 \
     && qemu-arm -L /usr/arm-linux-gnueabi /tmp/toolchain-arm32 \
-    && rm -f /tmp/toolchain-smoke.c /tmp/toolchain-aarch64 /tmp/toolchain-arm32
+    && gcc /tmp/toolchain-smoke.c -o /tmp/toolchain-x86 \
+    && /tmp/toolchain-x86 \
+    && rm -f /tmp/toolchain-smoke.c /tmp/toolchain-aarch64 /tmp/toolchain-arm32 /tmp/toolchain-x86
 
 WORKDIR /app
 COPY --from=compiler-build /wacc-compiler ./wacc-compiler

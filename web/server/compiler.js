@@ -126,10 +126,13 @@ async function executeAssembly(tempDir, architecture, stdin) {
   const linked = await linkAssembly(tempDir, architecture);
   if (!linked.ok) return linked.execution;
 
+  const command = linked.config.emulator || linked.binaryPath;
   const emulatorArgs = [];
-  if (linked.tools.sysroot) emulatorArgs.push("-L", linked.tools.sysroot);
-  emulatorArgs.push(linked.binaryPath);
-  const result = await runProcess(linked.config.emulator, emulatorArgs, {
+  if (linked.config.emulator) {
+    if (linked.tools.sysroot) emulatorArgs.push("-L", linked.tools.sysroot);
+    emulatorArgs.push(linked.binaryPath);
+  }
+  const result = await runProcess(command, emulatorArgs, {
     cwd: tempDir,
     input: stdin,
     timeoutMs: 10_000,
