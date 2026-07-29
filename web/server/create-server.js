@@ -57,6 +57,7 @@ function jsonReadiness(status, compileQueue, runSessions) {
     architectures: {
       aarch64: status.architectures.aarch64.available,
       arm32: status.architectures.arm32.available,
+      "x86-64": status.architectures["x86-64"].available,
     },
     queue: compileQueue.status,
     runs: runSessions.status,

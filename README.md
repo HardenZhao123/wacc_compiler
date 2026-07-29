@@ -1,6 +1,6 @@
 # WACC Compiler Studio
 
-This repository contains a Scala implementation of a WACC compiler and a browser-based compiler studio. The compiler parses, renames, type-checks, lowers to TAC, emits ARM32 or AArch64 assembly, and optionally applies peephole optimisation. The web app lets you edit WACC programs, choose a target architecture, inspect generated assembly, and run the program through the configured cross toolchain and QEMU.
+This repository contains a Scala implementation of a WACC compiler and a browser-based compiler studio. The compiler parses, renames, type-checks, lowers to TAC, emits ARM32, AArch64, or x86-64 assembly, and optionally applies peephole optimisation. The web app lets you edit WACC programs, choose a target architecture, inspect generated assembly, and run the program through the configured cross toolchain and QEMU.
 
 The WACC language reference is maintained separately from this README. Start the web app and click **Language spec** to read the full syntax and semantic rules. The source for that reference lives at `web/public/wacc-language-spec.md`.
 
@@ -8,7 +8,7 @@ The WACC language reference is maintained separately from this README. Start the
 
 ```text
 src/main/wacc/frontend        Lexer, parser, AST, renamer, return checker, type checker
-src/main/wacc/backend         TAC lowering plus ARM32 and AArch64 code generation
+src/main/wacc/backend         TAC lowering plus ARM32, AArch64, and x86-64 code generation
 src/test/wacc                 Unit and integration tests
 examples/valid                Accepted WACC programs grouped by language feature
 examples/invalid              Syntax and semantic rejection examples
@@ -22,7 +22,7 @@ Dockerfile                    Container build for the full web compiler studio
 - Scala CLI, or a `scala` command that provides Scala CLI-compatible project commands.
 - Node.js 18 or newer for the web server and web tests.
 - Optional for native packaged builds: GraalVM native-image support.
-- Optional for running generated assembly: ARM cross compilers and QEMU.
+- Optional for running generated assembly: ARM cross compilers and QEMU, plus gcc for x86-64.
 
 The compiler can still generate assembly without the execution toolchains. Running programs from the web app requires the target linker, emulator, and sysroot.
 
@@ -43,10 +43,10 @@ Use the generated wrapper after building `wacc-compiler`:
 CLI options:
 
 ```text
-compile <file.wacc> [--architecture aarch64|arm32] [--peephole-optim] [--no-peephole]
+compile <file.wacc> [--architecture aarch64|arm32|x86-64] [--peephole-optim] [--no-peephole]
 ```
 
-- `--architecture aarch64|arm32`: selects the assembly backend. The CLI defaults to ARM32 if omitted.
+- `--architecture aarch64|arm32|x86-64`: selects the assembly backend. The CLI defaults to ARM32 if omitted.
 - `--peephole-optim`: enables peephole optimisation. This is the default.
 - `--no-peephole`: disables peephole optimisation.
 
@@ -96,7 +96,7 @@ The web app provides:
 
 - A WACC editor with line numbers and file upload.
 - Built-in sample programs.
-- ARM32 and AArch64 target selection.
+- ARM32, AArch64, and x86-64 target selection.
 - Peephole optimisation toggle.
 - Assembly, compiler log, and program output tabs.
 - A **Language spec** button that opens the full WACC language reference.
@@ -121,6 +121,7 @@ The web server runs generated assembly by linking and executing it with target-s
 ```text
 AArch64: aarch64-linux-gnu-gcc, qemu-aarch64, /usr/aarch64-linux-gnu/
 ARM32:   arm-linux-gnueabi-gcc, qemu-arm, /usr/arm-linux-gnueabi/
+x86-64:  gcc, executed directly on x86-64 Linux hosts
 ```
 
 Override these paths when your tools are installed elsewhere:
@@ -132,6 +133,7 @@ WACC_AARCH64_SYSROOT
 WACC_ARM32_GCC
 WACC_ARM32_QEMU
 WACC_ARM32_SYSROOT
+WACC_X86_GCC
 ```
 
 ## Tests
@@ -159,11 +161,11 @@ docker build -t wacc-compiler-studio .
 docker run --rm -p 3000:3000 wacc-compiler-studio
 ```
 
-The image includes the packaged compiler, Node server, cross compilers, sysroots, and QEMU.
+The image includes the packaged compiler, Node server, cross compilers, native gcc, sysroots, and QEMU.
 
 ## Development Notes
 
 - The language specification shown in the app is `web/public/wacc-language-spec.md`.
 - Add new accepted programs under `examples/valid` and rejected programs under `examples/invalid`.
 - Keep generated `.s` files, local binaries, and build output out of commits unless they are intentionally part of a fixture.
-- Prefer explicit `--architecture` values in scripts so ARM32/AArch64 differences are easy to see.
+- Prefer explicit `--architecture` values in scripts so ARM32/AArch64/x86-64 differences are easy to see.

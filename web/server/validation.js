@@ -10,7 +10,7 @@ function validateCompileRequest(body) {
   }
 
   const source = body.source;
-  const architecture = body.architecture;
+  let architecture = body.architecture;
   const stdin = body.stdin ?? "";
 
   if (typeof source !== "string" || source.trim().length === 0) {
@@ -19,8 +19,11 @@ function validateCompileRequest(body) {
   if (source.length > MAX_SOURCE_CHARS) {
     throw Object.assign(new Error(`WACC source cannot exceed ${MAX_SOURCE_CHARS} characters`), { statusCode: 400 });
   }
-  if (architecture !== "aarch64" && architecture !== "arm32") {
-    throw Object.assign(new Error("Architecture must be aarch64 or arm32"), { statusCode: 400 });
+  if (architecture === "x86" || architecture === "x86_64") {
+    architecture = "x86-64";
+  }
+  if (!["aarch64", "arm32", "x86-64"].includes(architecture)) {
+    throw Object.assign(new Error("Architecture must be aarch64, arm32, or x86-64"), { statusCode: 400 });
   }
   if (typeof stdin !== "string" || stdin.length > MAX_STDIN_CHARS) {
     throw Object.assign(new Error(`Program input cannot exceed ${MAX_STDIN_CHARS} characters`), { statusCode: 400 });

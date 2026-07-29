@@ -34,6 +34,8 @@ object BackendConstant {
 
   val ASM_DIRECTIVE_WORD = ".word"
 
+  val ASM_DIRECTIVE_QUAD = ".quad"
+
   val ASM_DIRECTIVE_ASCIZ = ".asciz"
 
   val ASM_DIRECTIVE_ALIGN_4 = ".align 4"
