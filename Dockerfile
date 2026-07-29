@@ -18,6 +18,7 @@ FROM node:22-bookworm-slim
 RUN apt-get update \
     && apt-get install -y --no-install-recommends \
       gcc \
+      libc6-dev \
       gcc-aarch64-linux-gnu \
       gcc-arm-linux-gnueabi \
       libc6-dev-arm64-cross \
