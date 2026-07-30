@@ -169,6 +169,7 @@ select { min-width: 190px; padding: 0 36px 0 12px; color: var(--text); }
 .segmented-control input:checked + span { color: var(--text); background: #20344e; box-shadow: 0 3px 12px rgba(0,0,0,0.2); }
 
 .switch-row { display: flex; align-items: center; justify-content: space-between; gap: 18px; cursor: pointer; }
+.switch-row.disabled { cursor: not-allowed; opacity: 0.55; }
 .switch-row strong, .switch-row small { display: block; }
 .switch-row strong { font-size: 14px; }
 .switch-row small { margin-top: 3px; color: var(--muted); font-size: 12px; }

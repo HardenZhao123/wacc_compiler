@@ -32,7 +32,7 @@ function validateCompileRequest(body) {
   return {
     source,
     architecture,
-    optimise: body.optimise !== false,
+    optimise: architecture === "x86-64" ? false : body.optimise !== false,
     run: body.run === true,
     stdin,
   };

@@ -12,6 +12,12 @@ createSpecDialog({ showToast });
 
 const compilerSession = createCompilerSession({ showToast });
 
+document.querySelectorAll('input[name="architecture"]').forEach((input) => {
+  input.addEventListener("change", compilerSession.syncOptimisationAvailability);
+});
+elements.optimiseInput.addEventListener("change", compilerSession.updateOptimiseChoice);
+compilerSession.syncOptimisationAvailability();
+
 elements.compileButton.addEventListener("click", () => compilerSession.compile(false));
 elements.runButton.addEventListener("click", () => compilerSession.compile(true));
 elements.interactiveInputForm.addEventListener("submit", (event) => {

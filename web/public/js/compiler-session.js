@@ -13,6 +13,29 @@ export function createCompilerSession({ showToast }) {
   let activeRunId = null;
   let runPollTimer = null;
   let pollingRun = false;
+  let lastSupportedOptimiseChoice = elements.optimiseInput.checked;
+
+  function x86Selected() {
+    return selectedArchitecture() === "x86-64";
+  }
+
+  function effectiveOptimise() {
+    return !x86Selected() && elements.optimiseInput.checked;
+  }
+
+  function syncOptimisationAvailability() {
+    const disabled = x86Selected();
+    const switchRow = elements.optimiseInput.closest(".switch-row");
+
+    if (disabled) {
+      elements.optimiseInput.checked = false;
+    } else {
+      elements.optimiseInput.checked = lastSupportedOptimiseChoice;
+    }
+    elements.optimiseInput.disabled = disabled;
+    switchRow?.classList.toggle("disabled", disabled);
+    switchRow?.setAttribute("aria-disabled", String(disabled));
+  }
 
   function compilerLog(result) {
     const sections = [];
@@ -128,10 +151,11 @@ export function createCompilerSession({ showToast }) {
   }
 
   function compilePayload(run) {
+    syncOptimisationAvailability();
     return {
       source: elements.sourceEditor.value,
       architecture: selectedArchitecture(),
-      optimise: elements.optimiseInput.checked,
+      optimise: effectiveOptimise(),
       run,
       stdin: elements.stdinInput.value,
     };
@@ -170,7 +194,7 @@ export function createCompilerSession({ showToast }) {
       assembly: "",
       execution: null,
       architecture: selectedArchitecture(),
-      optimise: elements.optimiseInput.checked,
+      optimise: effectiveOptimise(),
     };
   }
 
@@ -302,5 +326,9 @@ export function createCompilerSession({ showToast }) {
     sendInteractiveInput,
     stopActiveRun,
     switchTab,
+    syncOptimisationAvailability,
+    updateOptimiseChoice() {
+      if (!x86Selected()) lastSupportedOptimiseChoice = elements.optimiseInput.checked;
+    },
   };
 }
