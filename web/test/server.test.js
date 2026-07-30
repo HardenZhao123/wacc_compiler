@@ -25,8 +25,10 @@ test("validates architecture and applies optimisation defaults", () => {
   const x86Request = validateCompileRequest({
     source: "begin\n  skip\nend",
     architecture: "x86",
+    optimise: true,
   });
   assert.equal(x86Request.architecture, "x86-64");
+  assert.equal(x86Request.optimise, false);
   assert.throws(
     () => validateCompileRequest({ source: "begin end", architecture: "mips" }),
     /Architecture must be/,
